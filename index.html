@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENTRAPPED: MAX ENGINE</title>
+    <title>Combat Initiation - Arena</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
-
     <div id="crt-lines"></div>
     <div id="vignette"></div>
     <div id="damage-overlay"></div>
+
+    <div id="hud-top-left" class="hud-panel">
+        <div class="wave-text">WAVE <span id="ui-wave" class="wave-val">1</span></div>
+        <div class="enemy-count">ENEMIES LEFT: <span id="ui-enemies">0</span></div>
+    </div>
+
+    <div id="style-hud" class="hud-panel">
+        <div id="style-rank-text">DESTRUCTIVE</div>
+        <div id="style-mult">x1.0</div>
+    </div>
 
     <div id="crosshair-container">
         <div class="ch-line" id="ch-top"></div>
@@ -21,43 +31,34 @@
         <div id="ch-dot"></div>
     </div>
 
-    <div id="hud-top-left" class="hud-panel">
-        <div class="wave-text">WAVE <span class="wave-val" id="ui-wave">1</span></div>
-        <div class="enemy-count">HOSTILES: <span id="ui-enemies">0</span></div>
-    </div>
-
     <div id="hud-bottom-left" class="hud-panel">
         <div id="hp-val">100 HP</div>
-        <div id="hp-bar-container"><div id="hp-bar-fill"></div></div>
-    </div>
-
-    <div id="hud-bottom-right" class="hud-panel">
-        <div id="weapon-display">SLINGSHOT</div>
-        <div id="ammo-display">Hitscan</div>
-        <div class="controls-hint">
-            [WASD] Move | [SPACE] Jump | [SHIFT] Dash<br>
-            [LMB] Attack | [1-2] Switch Weapon | [P] Pause
+        <div id="hp-bar-container">
+            <div id="hp-bar-fill"></div>
         </div>
     </div>
 
-    <div id="style-hud" class="hud-panel">
-        <div id="style-rank-text">DESTRUCTIVE</div>
-        <div id="style-mult">x1.0</div>
+    <div id="hud-bottom-right" class="hud-panel">
+        <div id="weapon-display">REAL SWORD</div>
+        <div class="controls-hint">
+            [1] Sword | [2] Slingshot | [3] Rocket<br>
+            [WASD] Move | [SHIFT] Dash | [SPACE] Jump
+        </div>
     </div>
 
     <div id="menu-main" class="menu-overlay">
-        <div class="menu-title">ENTRAPPED<br>MAX ENGINE</div>
-        <button class="btn" id="btn-start">CLICK TO PLAY</button>
+        <h1 class="menu-title">COMBAT INITIATION</h1>
+        <button id="btn-start" class="btn">START COMBAT</button>
     </div>
 
     <div id="menu-pause" class="menu-overlay">
-        <div class="menu-title">PAUSED</div>
-        <button class="btn" id="btn-resume">RESUME</button>
+        <h1 class="menu-title">PAUSED</h1>
+        <button id="btn-resume" class="btn">RESUME</button>
     </div>
 
     <div id="menu-death" class="menu-overlay">
-        <div class="menu-title" style="color: var(--danger);">DEAD</div>
-        <button class="btn" id="btn-restart">RESTART</button>
+        <h1 class="menu-title" style="color: var(--danger);">YOU DIED</h1>
+        <button id="btn-restart" class="btn">RETRY</button>
     </div>
 
     <script src="config.js"></script>
