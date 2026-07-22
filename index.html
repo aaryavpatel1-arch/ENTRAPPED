@@ -4,108 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ENTRAPPED: MAX ENGINE</title>
-    <style>
-        /* ==========================================================================
-           UI & POST-PROCESSING STYLES
-           ========================================================================== */
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Teko:wght@500;700&display=swap');
-        
-        :root {
-            --primary: #00ffcc;
-            --danger: #ff0055;
-            --warn: #ffcc00;
-            --bg-dark: rgba(5, 5, 10, 0.85);
-            --border: 2px solid #fff;
-        }
-
-        * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; overflow: hidden; }
-        body, html { width: 100%; height: 100%; background-color: #000; font-family: 'Teko', sans-serif; text-transform: uppercase; }
-
-        /* Post-Processing Overlays */
-        #crt-lines {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; pointer-events: none;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-            background-size: 100% 4px; mix-blend-mode: overlay; opacity: 0.6;
-        }
-        #vignette {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 49; pointer-events: none;
-            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.9) 130%);
-        }
-        #damage-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 48; pointer-events: none;
-            background: radial-gradient(circle, transparent 20%, rgba(255, 0, 0, 0.6) 100%);
-            opacity: 0; transition: opacity 0.1s ease-out; mix-blend-mode: screen;
-        }
-        #speed-lines {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 47; pointer-events: none;
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><line x1="50%" y1="50%" x2="0" y2="0" stroke="rgba(255,255,255,0.1)" stroke-width="2"/><line x1="50%" y1="50%" x2="100%" y2="0" stroke="rgba(255,255,255,0.1)" stroke-width="2"/><line x1="50%" y1="50%" x2="0" y2="100%" stroke="rgba(255,255,255,0.1)" stroke-width="2"/><line x1="50%" y1="50%" x2="100%" y2="100%" stroke="rgba(255,255,255,0.1)" stroke-width="2"/></svg>');
-            opacity: 0; transition: opacity 0.2s;
-        }
-
-        /* Dynamic Crosshair */
-        #crosshair-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; width: 30px; height: 30px; transition: width 0.1s, height 0.1s; }
-        .ch-line { position: absolute; background: #fff; box-shadow: 0 0 5px #000; }
-        #ch-top { top: 0; left: 50%; width: 2px; height: 10px; transform: translateX(-50%); }
-        #ch-bot { bottom: 0; left: 50%; width: 2px; height: 10px; transform: translateX(-50%); }
-        #ch-left { left: 0; top: 50%; width: 10px; height: 2px; transform: translateY(-50%); }
-        #ch-right { right: 0; top: 50%; width: 10px; height: 2px; transform: translateY(-50%); }
-        #ch-dot { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: var(--primary); transform: translate(-50%, -50%); border-radius: 50%; }
-        
-        /* Hitmarker */
-        #hitmarker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5); width: 40px; height: 40px; z-index: 21; opacity: 0; pointer-events: none; transition: transform 0.05s, opacity 0.05s; }
-        .hm-line { position: absolute; width: 2px; height: 12px; background: #fff; top: 14px; left: 19px; box-shadow: 0 0 6px var(--warn); }
-        .hm-1 { transform: rotate(45deg) translate(0, -15px); } .hm-2 { transform: rotate(135deg) translate(0, -15px); }
-        .hm-3 { transform: rotate(225deg) translate(0, -15px); } .hm-4 { transform: rotate(315deg) translate(0, -15px); }
-
-        /* HUD Panels */
-        .hud-panel { position: absolute; z-index: 10; color: #fff; text-shadow: 2px 2px 0 #000; }
-        
-        #hud-top-left { top: 20px; left: 30px; }
-        .wave-text { font-size: 32px; letter-spacing: 2px; color: #aaa; }
-        .wave-val { font-size: 48px; color: var(--primary); text-shadow: 0 0 15px rgba(0,255,204,0.5); }
-        .enemy-count { font-size: 24px; color: var(--danger); margin-top: -10px; }
-
-        #hud-bottom-left { bottom: 30px; left: 30px; width: 350px; }
-        #hp-val { font-size: 56px; color: #00ff66; line-height: 0.8; margin-bottom: 5px; text-shadow: 3px 3px 0 #000, 0 0 20px rgba(0,255,102,0.4); }
-        #hp-bar-container { width: 100%; height: 24px; background: rgba(0,0,0,0.8); border: var(--border); transform: skewX(-15deg); position: relative; box-shadow: 5px 5px 0 rgba(0,0,0,0.5); }
-        #hp-bar-fill { width: 100%; height: 100%; background: #00ff66; transition: width 0.1s linear, background-color 0.2s; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); }
-        #hp-bar-trail { position: absolute; top: 0; left: 0; height: 100%; width: 100%; background: var(--danger); z-index: -1; transition: width 0.5s ease-out; }
-
-        #hud-bottom-right { bottom: 30px; right: 30px; text-align: right; }
-        #weapon-display { font-size: 72px; color: #fff; letter-spacing: 4px; line-height: 0.8; -webkit-text-stroke: 1.5px #000; text-shadow: 5px 5px 0 var(--primary); }
-        #ammo-display { font-size: 32px; color: #aaa; margin-bottom: 10px; }
-        .controls-hint { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #888; text-shadow: 1px 1px 0 #000; text-transform: none; background: var(--bg-dark); padding: 10px; border: 1px solid #333; }
-
-        /* Style Meter */
-        #style-hud { top: 20px; right: 30px; text-align: right; }
-        #style-rank-text { font-size: 84px; color: var(--warn); font-style: italic; letter-spacing: 4px; line-height: 0.8; -webkit-text-stroke: 2px #000; text-shadow: 6px 6px 0 #000; transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-origin: right; }
-        #style-mult { font-size: 36px; color: #fff; margin-top: -5px; }
-        #style-bar-bg { width: 300px; height: 16px; background: rgba(0,0,0,0.8); border: var(--border); transform: skewX(-15deg); margin-left: auto; margin-top: 5px; box-shadow: 4px 4px 0 #000; }
-        #style-bar-fill { width: 0%; height: 100%; background: var(--warn); transition: width 0.1s linear; }
-        #style-log { font-size: 28px; display: flex; flex-direction: column; align-items: flex-end; margin-top: 15px; font-weight: 700; }
-        .style-item { animation: slideFade 2s forwards; }
-        @keyframes slideFade { 0% { opacity: 1; transform: translateX(0) scale(1.2); } 10% { transform: scale(1); } 70% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(50px); } }
-
-        /* Boss Bar */
-        #boss-ui { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; display: none; width: 700px; }
-        #boss-name { font-size: 48px; color: var(--danger); letter-spacing: 6px; -webkit-text-stroke: 1.5px #fff; text-shadow: 4px 4px 0 #000; margin-bottom: 5px; }
-        #boss-hp-bg { width: 100%; height: 28px; background: #111; border: var(--border); transform: skewX(-15deg); box-shadow: 6px 6px 0 #000; position: relative; }
-        #boss-hp-fill { width: 100%; height: 100%; background: var(--danger); transition: width 0.1s linear; box-shadow: inset 0 0 15px rgba(255,255,255,0.3); }
-
-        /* Floating Damage */
-        #floating-text-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 15; pointer-events: none; }
-        .float-dmg { position: absolute; color: #fff; font-size: 36px; font-weight: bold; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; animation: floatUp 0.9s cubic-bezier(0.215, 0.61, 0.355, 1) forwards; pointer-events: none; }
-        @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(0.8); } }
-
-        /* Menus */
-        .menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,5,8,0.95); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; backdrop-filter: blur(8px); }
-        .menu-title { font-size: 140px; color: #fff; text-shadow: 12px 12px 0 var(--danger), -4px -4px 0 var(--primary); letter-spacing: 8px; margin-bottom: 10px; transform: skewX(-5deg); line-height: 0.9; }
-        .menu-sub { font-size: 32px; color: var(--warn); letter-spacing: 4px; margin-bottom: 50px; background: rgba(0,0,0,0.6); padding: 10px 30px; border-left: 6px solid var(--warn); }
-        .btn { padding: 20px 60px; font-size: 48px; background: transparent; color: #fff; border: 4px solid #fff; cursor: pointer; transition: 0.1s; transform: skewX(-10deg); box-shadow: 8px 8px 0 var(--danger); font-family: 'Teko', sans-serif; text-transform: uppercase; }
-        .btn:hover { background: #fff; color: #000; transform: skewX(-10deg) translate(-4px, -4px); box-shadow: 12px 12px 0 var(--danger); }
-        
-        #menu-pause, #menu-death { display: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
@@ -113,17 +12,13 @@
     <div id="crt-lines"></div>
     <div id="vignette"></div>
     <div id="damage-overlay"></div>
-    <div id="speed-lines"></div>
-    <div id="floating-text-container"></div>
 
     <div id="crosshair-container">
-        <div class="ch-line" id="ch-top"></div><div class="ch-line" id="ch-bot"></div>
-        <div class="ch-line" id="ch-left"></div><div class="ch-line" id="ch-right"></div>
+        <div class="ch-line" id="ch-top"></div>
+        <div class="ch-line" id="ch-bot"></div>
+        <div class="ch-line" id="ch-left"></div>
+        <div class="ch-line" id="ch-right"></div>
         <div id="ch-dot"></div>
-    </div>
-    <div id="hitmarker">
-        <div class="hm-line hm-1"></div><div class="hm-line hm-2"></div>
-        <div class="hm-line hm-3"></div><div class="hm-line hm-4"></div>
     </div>
 
     <div id="hud-top-left" class="hud-panel">
@@ -133,430 +28,39 @@
 
     <div id="hud-bottom-left" class="hud-panel">
         <div id="hp-val">100 HP</div>
-        <div id="hp-bar-container">
-            <div id="hp-bar-trail"></div>
-            <div id="hp-bar-fill"></div>
-        </div>
+        <div id="hp-bar-container"><div id="hp-bar-fill"></div></div>
     </div>
 
     <div id="hud-bottom-right" class="hud-panel">
         <div id="weapon-display">SLINGSHOT</div>
-        <div id="ammo-display">Hitscan / Coin Alt</div>
+        <div id="ammo-display">Hitscan</div>
         <div class="controls-hint">
-            [1] Slingshot | [2] Sword | [3] Rocket | [4] Trowel<br>
-            [LMB] Primary Fire | [RMB] Alt Fire<br>
-            [SHIFT] Dash | [CTRL] Slide | [SPACE] Jump
+            [WASD] Move | [SPACE] Jump | [SHIFT] Dash<br>
+            [LMB] Attack | [1-2] Switch Weapon | [P] Pause
         </div>
     </div>
 
     <div id="style-hud" class="hud-panel">
         <div id="style-rank-text">DESTRUCTIVE</div>
         <div id="style-mult">x1.0</div>
-        <div id="style-bar-bg"><div id="style-bar-fill"></div></div>
-        <div id="style-log"></div>
-    </div>
-
-    <div id="boss-ui">
-        <div id="boss-name">THE NOOB KING</div>
-        <div id="boss-hp-bg"><div id="boss-hp-fill"></div></div>
     </div>
 
     <div id="menu-main" class="menu-overlay">
         <div class="menu-title">ENTRAPPED<br>MAX ENGINE</div>
-        <div class="menu-sub">PROCEDURAL ARENA SURVIVAL</div>
-        <button class="btn" id="btn-start">INITIALIZE DEPLOYMENT</button>
+        <button class="btn" id="btn-start">CLICK TO PLAY</button>
     </div>
 
     <div id="menu-pause" class="menu-overlay">
-        <div class="menu-title">SYSTEM PAUSED</div>
-        <div class="menu-sub">AWAITING INPUT</div>
-        <button class="btn" id="btn-resume">RESUME OPERATION</button>
+        <div class="menu-title">PAUSED</div>
+        <button class="btn" id="btn-resume">RESUME</button>
     </div>
 
     <div id="menu-death" class="menu-overlay">
-        <div class="menu-title" style="color: var(--danger); text-shadow: 12px 12px 0 #550000, -4px -4px 0 #000;">FATAL ERROR</div>
-        <div class="menu-sub" style="color: #fff; border-color: var(--danger);">VITALS DEPLETED // CHASSIS DESTROYED</div>
-        <button class="btn" id="btn-restart">REBOOT SEQUENCE</button>
+        <div class="menu-title" style="color: var(--danger);">DEAD</div>
+        <button class="btn" id="btn-restart">RESTART</button>
     </div>
 
-    <script>
-        /**
-         * ENTRAPPED: MAX ENGINE
-         * Advanced Single-File WebGL Game Engine
-         * Architecture: OOP, ECS-lite, Web Audio Synth, Procedural Generation
-         */
-
-        // ============================================================================
-        // 1. CORE ENGINE & CONFIGURATION
-        // Adjust SPEED_MULTIPLIER to tune overall game speed!
-        // ============================================================================
-        const CONFIG = {
-            SPEED_MULTIPLIER: 0.35, // Lowers speed across player movement & enemy AI
-            PLAYER_BASE_SPEED: 40,
-            NPC_BASE_SPEED: 25
-        };
-
-        const Engine = {
-            clock: new THREE.Clock(),
-            dt: 0,
-            state: 'MENU', // MENU, PLAY, PAUSE, DEAD
-            shake: 0,
-            
-            setState(newState) {
-                this.state = newState;
-                document.getElementById('menu-main').style.display = newState === 'MENU' ? 'flex' : 'none';
-                document.getElementById('menu-pause').style.display = newState === 'PAUSE' ? 'flex' : 'none';
-                document.getElementById('menu-death').style.display = newState === 'DEAD' ? 'flex' : 'none';
-                
-                if(newState === 'PLAY') { document.body.requestPointerLock(); AudioSys.initContext(); this.clock.getDelta(); }
-                else { document.exitPointerLock(); }
-            },
-            
-            addShake(amount) { this.shake = Math.max(this.shake, amount); }
-        };
-
-        // ============================================================================
-        // 2. AUDIO SYNTHESIZER (Web Audio API)
-        // ============================================================================
-        const AudioSys = {
-            ctx: null, masterGain: null,
-            initContext() {
-                if(this.ctx) return;
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AudioContext();
-                this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = 0.5;
-                this.masterGain.connect(this.ctx.destination);
-            },
-            playTone(freq, type, dur, vol, slideFreq=null) {
-                if(!this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                if(slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, this.ctx.currentTime + dur);
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
-                osc.connect(gain); gain.connect(this.masterGain);
-                osc.start(); osc.stop(this.ctx.currentTime + dur);
-            },
-            playNoise(dur, vol, filterFreq=1000) {
-                if(!this.ctx) return;
-                const bufSize = this.ctx.sampleRate * dur;
-                const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
-                const data = buf.getChannelData(0);
-                for(let i=0; i<bufSize; i++) data[i] = Math.random() * 2 - 1;
-                const src = this.ctx.createBufferSource(); src.buffer = buf;
-                const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = filterFreq;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
-                src.connect(filter); filter.connect(gain); gain.connect(this.masterGain); src.start();
-            },
-            // Sound Library
-            sfxShoot: () => AudioSys.playTone(800, 'square', 0.1, 0.15, 200),
-            sfxRocket: () => { AudioSys.playNoise(0.4, 0.4, 500); AudioSys.playTone(150, 'sawtooth', 0.4, 0.3, 40); },
-            sfxSwing: () => AudioSys.playTone(900, 'sine', 0.2, 0.2, 1200),
-            sfxExplode: () => { AudioSys.playNoise(0.8, 0.8, 800); AudioSys.playTone(80, 'square', 0.8, 0.6, 10); },
-            sfxHit: () => AudioSys.playTone(1500, 'square', 0.05, 0.2),
-            sfxCoin: () => AudioSys.playTone(2000, 'sine', 0.4, 0.2, 3500),
-            sfxParry: () => { AudioSys.playTone(2000, 'square', 0.2, 0.4, 4000); AudioSys.playTone(1000, 'sine', 0.3, 0.4); },
-            sfxJump: () => AudioSys.playTone(300, 'sine', 0.2, 0.1, 500),
-            sfxDash: () => AudioSys.playNoise(0.2, 0.3, 2000),
-            sfxDamage: () => { AudioSys.playNoise(0.3, 0.6, 300); AudioSys.playTone(120, 'sawtooth', 0.3, 0.5, 40); },
-            sfxBuild: () => AudioSys.playTone(400, 'square', 0.1, 0.2, 200)
-        };
-
-        // ============================================================================
-        // 3. PROCEDURAL TEXTURE GENERATION
-        // ============================================================================
-        const TexGen = {
-            create(type) {
-                const c = document.createElement('canvas'); c.width = 256; c.height = 256;
-                const ctx = c.getContext('2d');
-                
-                if (type === 'stud') {
-                    // Classic Roblox Stud
-                    ctx.fillStyle = '#175c17'; ctx.fillRect(0,0,256,256);
-                    ctx.strokeStyle = '#0f3d0f'; ctx.lineWidth = 8; ctx.strokeRect(0,0,256,256);
-                    ctx.fillStyle = '#1b6e1b'; ctx.beginPath(); ctx.arc(128,128,72,0,Math.PI*2); ctx.fill();
-                    ctx.strokeStyle = '#238a23'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(128,128,56,0,Math.PI); ctx.stroke();
-                } 
-                else if (type === 'inlet') {
-                    // Classic Roblox Inlet
-                    ctx.fillStyle = '#444'; ctx.fillRect(0,0,256,256);
-                    ctx.strokeStyle = '#222'; ctx.lineWidth = 8; ctx.strokeRect(0,0,256,256);
-                    ctx.fillStyle = '#333'; ctx.fillRect(96, 64, 64, 128); ctx.fillRect(64, 96, 128, 64);
-                }
-                else if (type === 'brick') {
-                    ctx.fillStyle = '#a52a2a'; ctx.fillRect(0,0,256,256);
-                    ctx.fillStyle = '#cccccc';
-                    ctx.fillRect(0, 120, 256, 16); ctx.fillRect(120, 0, 16, 120); 
-                    ctx.fillRect(56, 136, 16, 120); ctx.fillRect(184, 136, 16, 120);
-                }
-                else if (type === 'lava') {
-                    ctx.fillStyle = '#ff4400'; ctx.fillRect(0,0,256,256);
-                    ctx.fillStyle = '#ffaa00';
-                    for(let i=0; i<20; i++) {
-                        ctx.beginPath(); ctx.arc(Math.random()*256, Math.random()*256, Math.random()*30+10, 0, Math.PI*2); ctx.fill();
-                    }
-                }
-                
-                const tex = new THREE.CanvasTexture(c);
-                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-                tex.magFilter = THREE.NearestFilter; // Pixelated
-                return tex;
-            }
-        };
-
-        const texLib = {
-            stud: TexGen.create('stud'), inlet: TexGen.create('inlet'),
-            brick: TexGen.create('brick'), lava: TexGen.create('lava')
-        };
-
-        // ============================================================================
-        // 4. GRAPHICS & SCENE SETUP (THREE.JS)
-        // ============================================================================
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050811);
-        scene.fog = new THREE.FogExp2(0x050811, 0.003);
-
-        const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 2000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(1);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        document.body.appendChild(renderer.domElement);
-
-        // Lighting
-        scene.add(new THREE.AmbientLight(0x444455, 1.2));
-        const dirLight = new THREE.DirectionalLight(0xffeedd, 1.5);
-        dirLight.position.set(200, 300, -100);
-        dirLight.castShadow = true;
-        dirLight.shadow.camera.top = 400; dirLight.shadow.camera.bottom = -400;
-        dirLight.shadow.camera.left = -400; dirLight.shadow.camera.right = 400;
-        dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-        scene.add(dirLight);
-
-        // Material Library
-        const MatLib = {
-            floor: new THREE.MeshStandardMaterial({map: texLib.stud, roughness: 0.8}),
-            wall: new THREE.MeshStandardMaterial({map: texLib.inlet, roughness: 0.9}),
-            brick: new THREE.MeshStandardMaterial({map: texLib.brick, roughness: 1.0}),
-            lava: new THREE.MeshBasicMaterial({map: texLib.lava}),
-            enHead: new THREE.MeshLambertMaterial({color: 0xf5cd30}), // Classic Yellow
-            enBody: new THREE.MeshLambertMaterial({color: 0x0d69ac}), // Classic Blue
-            enLegs: new THREE.MeshLambertMaterial({color: 0x27462d}), // Classic Green
-            enRed: new THREE.MeshLambertMaterial({color: 0xaa0000}),
-            enDark: new THREE.MeshLambertMaterial({color: 0x222222})
-        };
-
-        // ============================================================================
-        // 5. INPUT MANAGER
-        // ============================================================================
-        const Input = {
-            keys: {}, mouse: { lmb: false, rmb: false },
-            init() {
-                window.addEventListener('keydown', e => this.keys[e.code] = true);
-                window.addEventListener('keyup', e => this.keys[e.code] = false);
-                window.addEventListener('mousedown', e => { if(e.button===0) this.mouse.lmb=true; if(e.button===2) this.mouse.rmb=true; });
-                window.addEventListener('mouseup', e => { if(e.button===0) this.mouse.lmb=false; if(e.button===2) this.mouse.rmb=false; });
-                window.addEventListener('contextmenu', e => e.preventDefault());
-                
-                // Mouse Look
-                this.yaw = 0; this.pitch = 0;
-                window.addEventListener('mousemove', e => {
-                    if (Engine.state !== 'PLAY') return;
-                    this.yaw -= e.movementX * 0.002;
-                    this.pitch -= e.movementY * 0.002;
-                    this.pitch = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, this.pitch));
-                    camera.rotation.order = 'YXZ';
-                    camera.rotation.set(this.pitch, this.yaw, 0);
-                });
-            },
-            consumeLMB() { const v = this.mouse.lmb; this.mouse.lmb = false; return v; },
-            consumeRMB() { const v = this.mouse.rmb; this.mouse.rmb = false; return v; }
-        };
-        Input.init();
-
-        // ============================================================================
-        // 6. OBJECT POOLING & EFFECTS (ECS-Lite)
-        // ============================================================================
-        const Pools = {
-            particles: [], projectiles: [], gibs: [], coins: [], colliders: [], entities: [],
-            
-            spawnParticle(pos, color, count, speed, size=0.4) {
-                const geo = new THREE.BoxGeometry(size,size,size);
-                const mat = new THREE.MeshBasicMaterial({color: color});
-                for(let i=0; i<count; i++) {
-                    const m = new THREE.Mesh(geo, mat); m.position.copy(pos); scene.add(m);
-                    const v = new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2, (Math.random()-0.5)*2).normalize().multiplyScalar(speed * CONFIG.SPEED_MULTIPLIER * (0.5+Math.random()));
-                    this.particles.push({ mesh: m, vel: v, life: 1.0 });
-                }
-            },
-            
-            spawnTracer(start, end, color=0xffffff) {
-                const mat = new THREE.LineBasicMaterial({color: color, linewidth: 2});
-                const geo = new THREE.BufferGeometry().setFromPoints([start, end]);
-                const line = new THREE.Line(geo, mat); scene.add(line);
-                setTimeout(()=>scene.remove(line), 50);
-            },
-
-            spawnDmgText(pos, amt, type='normal') {
-                const div = document.createElement('div');
-                div.className = 'float-dmg';
-                div.innerText = type === 'crit' ? amt + '!' : type === 'parry' ? 'PARRY' : amt;
-                div.style.color = type === 'crit' ? '#ffcc00' : type === 'parry' ? '#00ffcc' : '#fff';
-                if(type !== 'normal') div.style.fontSize = '48px';
-                
-                const tempV = pos.clone().project(camera);
-                div.style.left = ((tempV.x * .5 + .5) * window.innerWidth) + 'px';
-                div.style.top = ((tempV.y * -.5 + .5) * window.innerHeight) + 'px';
-                
-                document.getElementById('floating-text-container').appendChild(div);
-                setTimeout(() => div.remove(), 900);
-            },
-
-            triggerHitmarker(type='normal') {
-                AudioSys.sfxHit();
-                const hm = document.getElementById('hitmarker');
-                hm.style.opacity = '1'; hm.style.transform = 'translate(-50%, -50%) scale(1.5)';
-                const lines = document.querySelectorAll('.hm-line');
-                lines.forEach(l => l.style.boxShadow = type==='crit' ? '0 0 10px #ff0055' : '0 0 6px #ffcc00');
-                setTimeout(() => { hm.style.opacity = '0'; hm.style.transform = 'translate(-50%, -50%) scale(0.5)'; }, 100);
-            },
-            
-            update(dt) {
-                const adjDt = dt * CONFIG.SPEED_MULTIPLIER;
-                // Particles
-                for(let i = this.particles.length-1; i>=0; i--) {
-                    const p = this.particles[i]; p.mesh.position.addScaledVector(p.vel, adjDt); p.mesh.scale.setScalar(p.life);
-                    p.life -= adjDt * 2; if(p.life <= 0) { scene.remove(p.mesh); this.particles.splice(i, 1); }
-                }
-                // Coins
-                for(let i = this.coins.length-1; i>=0; i--) {
-                    const c = this.coins[i]; c.vel.y -= 140 * adjDt; c.mesh.position.addScaledVector(c.vel, adjDt);
-                    c.mesh.rotation.y += 25 * adjDt; c.life -= adjDt;
-                    if(c.mesh.position.y < 0 || c.life <= 0) { scene.remove(c.mesh); this.coins.splice(i, 1); }
-                }
-                // Gibs (Physical Body Parts)
-                for(let i = this.gibs.length-1; i>=0; i--) {
-                    const g = this.gibs[i];
-                    g.vel.y -= 140 * adjDt; g.mesh.position.addScaledVector(g.vel, adjDt);
-                    g.mesh.rotation.x += g.rot.x * adjDt; g.mesh.rotation.y += g.rot.y * adjDt;
-                    
-                    if (g.mesh.position.y <= g.mesh.scale.y/2) {
-                        g.mesh.position.y = g.mesh.scale.y/2;
-                        g.vel.y *= -0.5; g.vel.x *= 0.8; g.vel.z *= 0.8; 
-                    }
-                    g.life -= adjDt; if(g.life <= 0) { scene.remove(g.mesh); this.gibs.splice(i, 1); }
-                }
-                // Projectiles (Rockets, Lasers)
-                for(let i = this.projectiles.length-1; i>=0; i--) {
-                    const p = this.projectiles[i]; p.mesh.position.addScaledVector(p.vel, adjDt); p.life -= adjDt;
-                    let hit = false;
-                    
-                    if(p.isP) { // Player Projectile
-                        if(p.type === 'rocket' || p.type === 'parry') {
-                            if(p.mesh.position.y <= 0) hit = true;
-                            for(let c of this.colliders) { if(c.box.containsPoint(p.mesh.position)) hit = true; }
-                            this.entities.forEach(e => { if(!hit && e.state !== 'DEAD' && p.mesh.position.distanceTo(e.mesh.position) < 6) hit = true; });
-
-                            if(hit || p.life <= 0) {
-                                AudioSys.sfxExplode();
-                                const rad = p.type==='parry' ? 40 : 25; const dmg = p.type==='parry' ? 200 : 60;
-                                Engine.addShake(p.type==='parry' ? 3.0 : 1.5);
-                                
-                                this.entities.forEach(e => { 
-                                    if(e.state!=='DEAD' && e.mesh.position.distanceTo(p.mesh.position) < rad) { 
-                                        e.takeDamage(dmg, p.type==='parry'); Style.add("EXPLOSION", 50); Pools.triggerHitmarker();
-                                    } 
-                                });
-                                
-                                // Rocket Jump Physics
-                                if(camera.position.distanceTo(p.mesh.position) < rad * 0.8) {
-                                    const push = new THREE.Vector3().subVectors(camera.position, p.mesh.position).normalize();
-                                    Player.vel.addScaledVector(push, 180 * CONFIG.SPEED_MULTIPLIER); Player.vel.y += 100 * CONFIG.SPEED_MULTIPLIER; 
-                                    Player.takeDamage(15); Style.add("ROCKET JUMP", 150);
-                                }
-                                
-                                // VFX
-                                const expl = new THREE.Mesh(new THREE.SphereGeometry(rad), new THREE.MeshBasicMaterial({color: 0xff5500, transparent:true, opacity:0.8}));
-                                expl.position.copy(p.mesh.position); scene.add(expl); setTimeout(()=>scene.remove(expl), 150);
-                                this.spawnParticle(p.mesh.position, 0xffaa00, 30, 50, 1.0);
-                            }
-                        }
-                    } else { // Enemy Projectile
-                        if(p.mesh.position.distanceTo(camera.position) < 5) { Player.takeDamage(30); hit = true; }
-                    }
-                    if(hit || p.life <= 0) { scene.remove(p.mesh); this.projectiles.splice(i, 1); }
-                }
-            }
-        };
-
-        // ============================================================================
-        // 7. UI & STYLE COMBO SYSTEM
-        // ============================================================================
-        const Style = {
-            score: 0, mult: 1.0, timer: 10,
-            ranks: [
-                { min: 0, name: "DESTRUCTIVE", col: "#00aaff" }, { min: 800, name: "CARNAGE", col: "#00ff66" },
-                { min: 2000, name: "BRUTAL", col: "#ffcc00" }, { min: 4000, name: "SADISTIC", col: "#ff6600" },
-                { min: 7000, name: "ULTRAKILL", col: "#ff0055" }
-            ],
-            add(text, pts) {
-                const final = Math.floor(pts * this.mult);
-                this.score += final; this.mult = Math.min(5.0, this.mult + 0.25); this.timer = 10;
-                
-                const feed = document.getElementById('style-log');
-                const div = document.createElement('div'); div.className = 'style-item';
-                div.innerHTML = `<span style="color:#aaa;">+${final}</span> ${text}`;
-                feed.prepend(div); setTimeout(() => div.remove(), 2000);
-                
-                const r = document.getElementById('style-rank-text');
-                r.style.transform = 'scale(1.3) rotate(-5deg)';
-                setTimeout(() => r.style.transform = 'scale(1) rotate(0deg)', 100);
-            },
-            update(dt) {
-                this.timer -= dt;
-                if(this.timer <= 0) { this.mult = Math.max(1.0, this.mult - dt * 0.8); this.score = Math.max(0, this.score - dt * 250); }
-                
-                let cRank = this.ranks[0];
-                for(let i=0; i<this.ranks.length; i++) {
-                    if(this.score >= this.ranks[i].min) {
-                        cRank = this.ranks[i];
-                    }
-                }
-                
-                document.getElementById('style-rank-text').innerText = cRank.name;
-                document.getElementById('style-rank-text').style.color = cRank.col;
-                document.getElementById('style-mult').innerText = 'x' + this.mult.toFixed(1);
-                document.getElementById('style-bar-fill').style.width = (this.timer * 10) + '%';
-            }
-        };
-
-        // UI Event Listeners
-        document.getElementById('btn-start').addEventListener('click', () => Engine.setState('PLAY'));
-        document.getElementById('btn-resume').addEventListener('click', () => Engine.setState('PLAY'));
-        document.getElementById('btn-restart').addEventListener('click', () => { location.reload(); });
-
-        window.addEventListener('keydown', e => {
-            if(e.code === 'KeyP' || e.code === 'Escape') {
-                if(Engine.state === 'PLAY') Engine.setState('PAUSE');
-                else if(Engine.state === 'PAUSE') Engine.setState('PLAY');
-            }
-        });
-
-        // Basic Loop Placeholder
-        function animate() {
-            requestAnimationFrame(animate);
-            const dt = Engine.clock.getDelta();
-            if(Engine.state === 'PLAY') {
-                Pools.update(dt);
-                Style.update(dt);
-            }
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
+    <script src="config.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>
