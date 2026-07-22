@@ -187,8 +187,15 @@
          */
 
         // ============================================================================
-        // 1. CORE ENGINE & GLOBALS
+        // 1. CORE ENGINE & CONFIGURATION
+        // Adjust SPEED_MULTIPLIER to tune overall game speed!
         // ============================================================================
+        const CONFIG = {
+            SPEED_MULTIPLIER: 0.35, // Lowers speed across player movement & enemy AI
+            PLAYER_BASE_SPEED: 40,
+            NPC_BASE_SPEED: 25
+        };
+
         const Engine = {
             clock: new THREE.Clock(),
             dt: 0,
@@ -382,7 +389,7 @@
                 const mat = new THREE.MeshBasicMaterial({color: color});
                 for(let i=0; i<count; i++) {
                     const m = new THREE.Mesh(geo, mat); m.position.copy(pos); scene.add(m);
-                    const v = new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2, (Math.random()-0.5)*2).normalize().multiplyScalar(speed * (0.5+Math.random()));
+                    const v = new THREE.Vector3((Math.random()-0.5)*2, Math.random()*2, (Math.random()-0.5)*2).normalize().multiplyScalar(speed * CONFIG.SPEED_MULTIPLIER * (0.5+Math.random()));
                     this.particles.push({ mesh: m, vel: v, life: 1.0 });
                 }
             },
@@ -419,32 +426,33 @@
             },
             
             update(dt) {
+                const adjDt = dt * CONFIG.SPEED_MULTIPLIER;
                 // Particles
                 for(let i = this.particles.length-1; i>=0; i--) {
-                    const p = this.particles[i]; p.mesh.position.addScaledVector(p.vel, dt); p.mesh.scale.setScalar(p.life);
-                    p.life -= dt * 2; if(p.life <= 0) { scene.remove(p.mesh); this.particles.splice(i, 1); }
+                    const p = this.particles[i]; p.mesh.position.addScaledVector(p.vel, adjDt); p.mesh.scale.setScalar(p.life);
+                    p.life -= adjDt * 2; if(p.life <= 0) { scene.remove(p.mesh); this.particles.splice(i, 1); }
                 }
                 // Coins
                 for(let i = this.coins.length-1; i>=0; i--) {
-                    const c = this.coins[i]; c.vel.y -= 140 * dt; c.mesh.position.addScaledVector(c.vel, dt);
-                    c.mesh.rotation.y += 25 * dt; c.life -= dt;
+                    const c = this.coins[i]; c.vel.y -= 140 * adjDt; c.mesh.position.addScaledVector(c.vel, adjDt);
+                    c.mesh.rotation.y += 25 * adjDt; c.life -= adjDt;
                     if(c.mesh.position.y < 0 || c.life <= 0) { scene.remove(c.mesh); this.coins.splice(i, 1); }
                 }
                 // Gibs (Physical Body Parts)
                 for(let i = this.gibs.length-1; i>=0; i--) {
                     const g = this.gibs[i];
-                    g.vel.y -= 140 * dt; g.mesh.position.addScaledVector(g.vel, dt);
-                    g.mesh.rotation.x += g.rot.x * dt; g.mesh.rotation.y += g.rot.y * dt;
+                    g.vel.y -= 140 * adjDt; g.mesh.position.addScaledVector(g.vel, adjDt);
+                    g.mesh.rotation.x += g.rot.x * adjDt; g.mesh.rotation.y += g.rot.y * adjDt;
                     
                     if (g.mesh.position.y <= g.mesh.scale.y/2) {
                         g.mesh.position.y = g.mesh.scale.y/2;
                         g.vel.y *= -0.5; g.vel.x *= 0.8; g.vel.z *= 0.8; 
                     }
-                    g.life -= dt; if(g.life <= 0) { scene.remove(g.mesh); this.gibs.splice(i, 1); }
+                    g.life -= adjDt; if(g.life <= 0) { scene.remove(g.mesh); this.gibs.splice(i, 1); }
                 }
                 // Projectiles (Rockets, Lasers)
                 for(let i = this.projectiles.length-1; i>=0; i--) {
-                    const p = this.projectiles[i]; p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
+                    const p = this.projectiles[i]; p.mesh.position.addScaledVector(p.vel, adjDt); p.life -= adjDt;
                     let hit = false;
                     
                     if(p.isP) { // Player Projectile
@@ -467,7 +475,7 @@
                                 // Rocket Jump Physics
                                 if(camera.position.distanceTo(p.mesh.position) < rad * 0.8) {
                                     const push = new THREE.Vector3().subVectors(camera.position, p.mesh.position).normalize();
-                                    Player.vel.addScaledVector(push, 180); Player.vel.y += 100; 
+                                    Player.vel.addScaledVector(push, 180 * CONFIG.SPEED_MULTIPLIER); Player.vel.y += 100 * CONFIG.SPEED_MULTIPLIER; 
                                     Player.takeDamage(15); Style.add("ROCKET JUMP", 150);
                                 }
                                 
@@ -512,547 +520,42 @@
                 this.timer -= dt;
                 if(this.timer <= 0) { this.mult = Math.max(1.0, this.mult - dt * 0.8); this.score = Math.max(0, this.score - dt * 250); }
                 
-                let cRank = this.ranks[0], nRank = this.ranks[1];
+                let cRank = this.ranks[0];
                 for(let i=0; i<this.ranks.length; i++) {
                     if(this.score >= this.ranks[i].min) {
                         cRank = this.ranks[i];
-                        nRank = this.ranks[i+1] || { min: this.ranks[i].min * 1.5 };
                     }
                 }
-                const rEl = document.getElementById('style-rank-text');
-                rEl.innerText = cRank.name; rEl.style.color = cRank.col;
-                document.getElementById('style-mult').innerText = `x${this.mult.toFixed(1)}`;
                 
-                const pct = Math.min(100, Math.max(0, ((this.score - cRank.min) / (nRank.min - cRank.min)) * 100));
-                document.getElementById('style-bar-fill').style.width = pct + '%';
+                document.getElementById('style-rank-text').innerText = cRank.name;
+                document.getElementById('style-rank-text').style.color = cRank.col;
+                document.getElementById('style-mult').innerText = 'x' + this.mult.toFixed(1);
+                document.getElementById('style-bar-fill').style.width = (this.timer * 10) + '%';
             }
         };
 
-        // ============================================================================
-        // 8. MAP GENERATOR & ARENA ENVIRONMENT
-        // ============================================================================
-        const MapGen = {
-            arenaSize: 260,
-            build() {
-                // Clear old
-                Pools.colliders.forEach(c => scene.remove(c.mesh));
-                Pools.colliders = [];
+        // UI Event Listeners
+        document.getElementById('btn-start').addEventListener('click', () => Engine.setState('PLAY'));
+        document.getElementById('btn-resume').addEventListener('click', () => Engine.setState('PLAY'));
+        document.getElementById('btn-restart').addEventListener('click', () => { location.reload(); });
 
-                const half = this.arenaSize / 2;
-                // Floor
-                const fGeo = new THREE.BoxGeometry(this.arenaSize, 10, this.arenaSize);
-                MatLib.floor.map.repeat.set(16, 16);
-                const floor = new THREE.Mesh(fGeo, MatLib.floor); floor.position.set(0, -5, 0); floor.receiveShadow = true;
-                scene.add(floor);
-
-                // Lava Pit perimeter hazard
-                const lGeo = new THREE.BoxGeometry(this.arenaSize + 200, 2, this.arenaSize + 200);
-                MatLib.lava.map.repeat.set(20, 20);
-                const lava = new THREE.Mesh(lGeo, MatLib.lava); lava.position.set(0, -15, 0); scene.add(lava);
-
-                // Walls
-                const wMat = MatLib.wall; wMat.map.repeat.set(10, 4);
-                this.addWall(0, 30, -half, this.arenaSize, 60, 10, wMat);
-                this.addWall(0, 30, half, this.arenaSize, 60, 10, wMat);
-                this.addWall(-half, 30, 0, 10, 60, this.arenaSize, wMat);
-                this.addWall(half, 30, 0, 10, 60, this.arenaSize, wMat);
-
-                // Arena Pillars / Cover
-                for(let x = -80; x <= 80; x += 80) {
-                    for(let z = -80; z <= 80; z += 80) {
-                        if(x === 0 && z === 0) continue;
-                        this.addWall(x, 20, z, 20, 40, 20, MatLib.brick);
-                    }
-                }
-            },
-            addWall(x, y, z, sx, sy, sz, mat) {
-                const geo = new THREE.BoxGeometry(sx, sy, sz);
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
-                scene.add(mesh);
-                const box = new THREE.Box3().setFromObject(mesh);
-                Pools.colliders.push({ mesh, box, sx, sy, sz });
+        window.addEventListener('keydown', e => {
+            if(e.code === 'KeyP' || e.code === 'Escape') {
+                if(Engine.state === 'PLAY') Engine.setState('PAUSE');
+                else if(Engine.state === 'PAUSE') Engine.setState('PLAY');
             }
-        };
+        });
 
-        // ============================================================================
-        // 9. PLAYER CONTROLLER & WEAPONS
-        // ============================================================================
-        const Player = {
-            pos: new THREE.Vector3(0, 10, 0),
-            vel: new THREE.Vector3(),
-            hp: 100, maxHp: 100,
-            grounded: false,
-            sliding: false,
-            dashCooldown: 0,
-            weaponIdx: 0,
-            shootTimer: 0,
-            
-            // Weapons Arsenal
-            weapons: [
-                { name: "SLINGSHOT", fireRate: 0.1, type: "hitscan" },
-                { name: "SWORD", fireRate: 0.4, type: "melee" },
-                { name: "ROCKET LAUNCHER", fireRate: 0.8, type: "rocket" },
-                { name: "TROWEL", fireRate: 0.3, type: "builder" }
-            ],
-
-            init() {
-                camera.position.set(0, 10, 0);
-            },
-
-            takeDamage(amt) {
-                this.hp -= amt; AudioSys.sfxDamage();
-                Engine.addShake(1.2);
-                document.getElementById('damage-overlay').style.opacity = '1';
-                setTimeout(() => document.getElementById('damage-overlay').style.opacity = '0', 150);
-                
-                if(this.hp <= 0) {
-                    this.hp = 0; Engine.setState('DEAD');
-                }
-                this.updateUI();
-            },
-
-            heal(amt) {
-                this.hp = Math.min(this.maxHp, this.hp + amt);
-                this.updateUI();
-            },
-
-            updateUI() {
-                document.getElementById('hp-val').innerText = `${Math.ceil(this.hp)} HP`;
-                const pct = Math.max(0, (this.hp / this.maxHp) * 100);
-                document.getElementById('hp-bar-fill').style.width = pct + '%';
-                setTimeout(() => document.getElementById('hp-bar-trail').style.width = pct + '%', 150);
-                
-                const w = this.weapons[this.weaponIdx];
-                document.getElementById('weapon-display').innerText = w.name;
-            },
-
-            update(dt) {
-                if(Engine.state !== 'PLAY') return;
-
-                // Timers
-                this.shootTimer -= dt;
-                this.dashCooldown -= dt;
-
-                // Weapon Switching Keys
-                if(Input.keys['Digit1']) { this.weaponIdx = 0; this.updateUI(); }
-                if(Input.keys['Digit2']) { this.weaponIdx = 1; this.updateUI(); }
-                if(Input.keys['Digit3']) { this.weaponIdx = 2; this.updateUI(); }
-                if(Input.keys['Digit4']) { this.weaponIdx = 3; this.updateUI(); }
-
-                // Movement Vector
-                const moveDir = new THREE.Vector3();
-                if (Input.keys['KeyW']) moveDir.z -= 1;
-                if (Input.keys['KeyS']) moveDir.z += 1;
-                if (Input.keys['KeyA']) moveDir.x -= 1;
-                if (Input.keys['KeyD']) moveDir.x += 1;
-                moveDir.normalize();
-                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Input.yaw);
-
-                // Ground Check
-                this.grounded = camera.position.y <= 10.1;
-
-                // Slide Mechanics
-                if(Input.keys['ControlLeft'] && this.grounded && !this.sliding) {
-                    this.sliding = true;
-                    this.vel.addScaledVector(moveDir.length() > 0 ? moveDir : new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), Input.yaw), 70);
-                }
-                if(!Input.keys['ControlLeft']) this.sliding = false;
-
-                // Speed / Acceleration Logic
-                const moveSpeed = this.sliding ? 20 : 110;
-                if(this.grounded) {
-                    this.vel.x *= this.sliding ? 0.98 : 0.82;
-                    this.vel.z *= this.sliding ? 0.98 : 0.82;
-                    if (moveDir.length() > 0) this.vel.addScaledVector(moveDir, moveSpeed * dt * 60);
-                } else {
-                    // Air Control
-                    if (moveDir.length() > 0) this.vel.addScaledVector(moveDir, moveSpeed * 0.3 * dt * 60);
-                }
-
-                // Jump
-                if(Input.keys['Space'] && this.grounded) {
-                    this.vel.y = 55; AudioSys.sfxJump(); this.grounded = false;
-                }
-
-                // Dash Impulse
-                if(Input.keys['ShiftLeft'] && this.dashCooldown <= 0) {
-                    this.dashCooldown = 0.8;
-                    AudioSys.sfxDash();
-                    const dDir = moveDir.length() > 0 ? moveDir : new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0), Input.yaw);
-                    this.vel.addScaledVector(dDir, 120);
-                    Style.add("DASH", 25);
-                    document.getElementById('speed-lines').style.opacity = '1';
-                    setTimeout(() => document.getElementById('speed-lines').style.opacity = '0', 200);
-                }
-
-                // Gravity Application
-                this.vel.y -= 150 * dt;
-                camera.position.addScaledVector(this.vel, dt);
-
-                // Ground Collision Floor Limit
-                if(camera.position.y < 10) {
-                    camera.position.y = 10;
-                    this.vel.y = 0;
-                    this.grounded = true;
-                }
-
-                // Arena Outer Limit / Wall Collisions Simple Clamp
-                const hBound = MapGen.arenaSize / 2 - 5;
-                camera.position.x = Math.max(-hBound, Math.min(hBound, camera.position.x));
-                camera.position.z = Math.max(-hBound, Math.min(hBound, camera.position.z));
-
-                // Shooting Logic
-                if(Input.mouse.lmb && this.shootTimer <= 0) {
-                    this.primaryFire();
-                }
-                if(Input.consumeRMB()) {
-                    this.altFire();
-                }
-            },
-
-            primaryFire() {
-                const w = this.weapons[this.weaponIdx];
-                this.shootTimer = w.fireRate;
-
-                const raycaster = new THREE.Raycaster();
-                raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-
-                if(w.type === "hitscan") {
-                    AudioSys.sfxShoot();
-                    Engine.addShake(0.2);
-
-                    // Check for Coin Target (RICOCHET / COIN SHOT)
-                    let hitCoin = null;
-                    Pools.coins.forEach(c => {
-                        if(camera.position.distanceTo(c.mesh.position) < 80) hitCoin = c;
-                    });
-
-                    if(hitCoin) {
-                        // COIN RAYS REFLECT TO ENEMIES NEARBY
-                        AudioSys.sfxCoin();
-                        Pools.spawnParticle(hitCoin.mesh.position, 0xffff00, 25, 40);
-                        Style.add("FISTFUL OF DOLLAR", 200);
-
-                        // Find closest enemy to coin
-                        let target = null, closestDist = Infinity;
-                        Pools.entities.forEach(e => {
-                            if(e.state !== 'DEAD') {
-                                const d = e.mesh.position.distanceTo(hitCoin.mesh.position);
-                                if(d < closestDist) { closestDist = d; target = e; }
-                            }
-                        });
-
-                        if(target) {
-                            Pools.spawnTracer(hitCoin.mesh.position, target.mesh.position, 0x00ffcc);
-                            target.takeDamage(120, true);
-                            Pools.triggerHitmarker('crit');
-                        }
-                        scene.remove(hitCoin.mesh);
-                        Pools.coins.splice(Pools.coins.indexOf(hitCoin), 1);
-                        return;
-                    }
-
-                    // Standard Hitscan Shooting
-                    const intersects = raycaster.intersectObjects(scene.children, true);
-                    const endPos = new THREE.Vector3().addVectors(camera.position, raycaster.ray.direction.clone().multiplyScalar(200));
-                    
-                    if(intersects.length > 0) {
-                        const hit = intersects[0];
-                        Pools.spawnTracer(camera.position, hit.point, 0x00ffcc);
-                        Pools.spawnParticle(hit.point, 0xffffff, 6, 15);
-
-                        // Check entity hit
-                        Pools.entities.forEach(e => {
-                            if(e.state !== 'DEAD' && (e.mesh === hit.object || e.mesh.children.includes(hit.object))) {
-                                const isHead = hit.object.name === 'head';
-                                e.takeDamage(isHead ? 60 : 30, isHead);
-                                Pools.triggerHitmarker(isHead ? 'crit' : 'normal');
-                                if(isHead) Style.add("HEADSHOT", 75);
-                            }
-                        });
-                    } else {
-                        Pools.spawnTracer(camera.position, endPos, 0x00ffcc);
-                    }
-                } 
-                else if (w.type === "melee") {
-                    AudioSys.sfxSwing();
-                    Engine.addShake(0.4);
-
-                    // Check Enemy Hits in arc
-                    Pools.entities.forEach(e => {
-                        if(e.state !== 'DEAD' && camera.position.distanceTo(e.mesh.position) < 16) {
-                            e.takeDamage(75);
-                            Pools.triggerHitmarker('crit');
-                            Style.add("SLICED", 50);
-                        }
-                    });
-
-                    // Parry Projectiles logic
-                    Pools.projectiles.forEach(p => {
-                        if(!p.isP && camera.position.distanceTo(p.mesh.position) < 18) {
-                            AudioSys.sfxParry();
-                            p.isP = true;
-                            p.type = 'parry';
-                            p.vel.negate().multiplyScalar(2.5);
-                            Pools.spawnDmgText(p.mesh.position, 0, 'parry');
-                            Style.add("PROJECTILE PARRY", 300);
-                        }
-                    });
-                }
-                else if (w.type === "rocket") {
-                    AudioSys.sfxRocket();
-                    Engine.addShake(0.8);
-                    
-                    const rGeo = new THREE.CylinderGeometry(0.4, 0.4, 2);
-                    const rMat = new THREE.MeshBasicMaterial({color: 0xff4400});
-                    const rocket = new THREE.Mesh(rGeo, rMat);
-                    rocket.position.copy(camera.position).addScaledVector(raycaster.ray.direction, 2);
-                    rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), raycaster.ray.direction);
-                    scene.add(rocket);
-
-                    Pools.projectiles.push({
-                        mesh: rocket,
-                        vel: raycaster.ray.direction.clone().multiplyScalar(120),
-                        life: 4,
-                        isP: true,
-                        type: 'rocket'
-                    });
-                }
-                else if (w.type === "builder") {
-                    // Trowel Builds cover brick block ahead
-                    const spawnPos = new THREE.Vector3().addVectors(camera.position, raycaster.ray.direction.clone().multiplyScalar(12));
-                    spawnPos.y = Math.max(5, spawnPos.y);
-                    MapGen.addWall(spawnPos.x, spawnPos.y, spawnPos.z, 10, 10, 10, MatLib.brick);
-                    AudioSys.sfxBuild();
-                    Pools.spawnParticle(spawnPos, 0xa52a2a, 15, 20);
-                    Style.add("CONSTRUCTION", 20);
-                }
-            },
-
-            altFire() {
-                // Toss Coin for Slingshot Ricochet Multiplier
-                if(this.weaponIdx === 0) {
-                    AudioSys.sfxCoin();
-                    const cGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.2);
-                    const cMat = new THREE.MeshBasicMaterial({color: 0xffcc00});
-                    const coin = new THREE.Mesh(cGeo, cMat);
-                    coin.position.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 2);
-                    scene.add(coin);
-
-                    const throwVel = camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(40);
-                    throwVel.y += 35; // Toss Upward arc
-                    Pools.coins.push({ mesh: coin, vel: throwVel, life: 3.0 });
-                }
-            }
-        };
-
-        // ============================================================================
-        // 10. ENEMY AI & ENTITY SYSTEM
-        // ============================================================================
-        class Enemy {
-            constructor(x, z, type='NOOB') {
-                this.type = type;
-                this.hp = type === 'BOSS' ? 1200 : type === 'BALLER' ? 150 : 80;
-                this.maxHp = this.hp;
-                this.speed = type === 'BOSS' ? 25 : type === 'BALLER' ? 45 : 35;
-                this.state = 'ALIVE';
-                
-                // Visual Rig Assembly
-                this.mesh = new THREE.Group();
-                this.mesh.position.set(x, 6, z);
-
-                const headG = new THREE.BoxGeometry(3,3,3);
-                const head = new THREE.Mesh(headG, type==='BOSS' ? MatLib.enRed : MatLib.enHead);
-                head.position.y = 4.5; head.name = 'head'; head.castShadow = true;
-                this.mesh.add(head);
-
-                const bodyG = new THREE.BoxGeometry(4,5,2);
-                const body = new THREE.Mesh(bodyG, type==='BOSS' ? MatLib.enDark : MatLib.enBody);
-                body.position.y = 0.5; body.castShadow = true;
-                this.mesh.add(body);
-
-                if(type === 'BOSS') this.mesh.scale.set(3, 3, 3);
-
-                scene.add(this.mesh);
-                this.shootTimer = 0;
-            }
-
-            takeDamage(amt, isCrit=false) {
-                this.hp -= amt;
-                Pools.spawnParticle(this.mesh.position, isCrit ? 0xffcc00 : 0xff0000, 10, 20);
-                Pools.spawnDmgText(this.mesh.position, amt, isCrit ? 'crit' : 'normal');
-
-                if(this.hp <= 0 && this.state !== 'DEAD') {
-                    this.die();
-                }
-            }
-
-            die() {
-                this.state = 'DEAD';
-                Style.add(this.type + " KILLED", this.type === 'BOSS' ? 1000 : 100);
-                Player.heal(15); // Blood heal on kill mechanic
-                
-                // Dismemberment Gibs Spawning
-                for(let i=0; i<5; i++) {
-                    const g = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), MatLib.enHead);
-                    g.position.copy(this.mesh.position);
-                    scene.add(g);
-                    Pools.gibs.push({
-                        mesh: g,
-                        vel: new THREE.Vector3((Math.random()-0.5)*40, Math.random()*50+20, (Math.random()-0.5)*40),
-                        rot: new THREE.Vector3(Math.random()*10, Math.random()*10, 0),
-                        life: 3.0
-                    });
-                }
-                scene.remove(this.mesh);
-            }
-
-            update(dt) {
-                if(this.state === 'DEAD') return;
-
-                const toPlayer = new THREE.Vector3().subVectors(camera.position, this.mesh.position);
-                toPlayer.y = 0;
-                const dist = toPlayer.length();
-                toPlayer.normalize();
-
-                // Look at Player
-                this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
-
-                // Chase Movement
-                if(dist > 6) {
-                    this.mesh.position.addScaledVector(toPlayer, this.speed * dt);
-                } else {
-                    // Melee Attack Hit Player
-                    Player.takeDamage(15 * dt * 60);
-                }
-
-                // Baller / Boss Ranged Attacks
-                if(this.type === 'BALLER' || this.type === 'BOSS') {
-                    this.shootTimer -= dt;
-                    if(this.shootTimer <= 0 && dist < 120) {
-                        this.shootTimer = this.type === 'BOSS' ? 1.0 : 2.5;
-                        
-                        // Fire Laser/Projectile
-                        const pGeo = new THREE.SphereGeometry(1.5);
-                        const pMat = new THREE.MeshBasicMaterial({color: 0xff0055});
-                        const proj = new THREE.Mesh(pGeo, pMat);
-                        proj.position.copy(this.mesh.position).add(new THREE.Vector3(0, 4, 0));
-                        scene.add(proj);
-
-                        Pools.projectiles.push({
-                            mesh: proj,
-                            vel: toPlayer.clone().multiplyScalar(60),
-                            life: 5.0,
-                            isP: false
-                        });
-                    }
-                }
-            }
-        }
-
-        // ============================================================================
-        // 11. WAVE MANAGER & GAME STATE ENGINE
-        // ============================================================================
-        const WaveSys = {
-            wave: 1,
-            enemiesLeft: 0,
-            spawnTimer: 0,
-
-            startWave() {
-                this.enemiesLeft = this.wave * 4;
-                document.getElementById('ui-wave').innerText = this.wave;
-                
-                if(this.wave % 5 === 0) {
-                    // BOSS WAVE
-                    document.getElementById('boss-ui').style.display = 'block';
-                    const boss = new Enemy(0, -60, 'BOSS');
-                    Pools.entities.push(boss);
-                } else {
-                    document.getElementById('boss-ui').style.display = 'none';
-                    for(let i=0; i<this.enemiesLeft; i++) {
-                        const rx = (Math.random()-0.5)*200;
-                        const rz = (Math.random()-0.5)*200;
-                        const type = Math.random() > 0.6 ? 'BALLER' : 'NOOB';
-                        Pools.entities.push(new Enemy(rx, rz, type));
-                    }
-                }
-            },
-
-            update(dt) {
-                let alive = 0;
-                Pools.entities.forEach(e => {
-                    if(e.state !== 'DEAD') {
-                        alive++;
-                        e.update(dt);
-                        if(e.type === 'BOSS') {
-                            const pct = Math.max(0, (e.hp / e.maxHp) * 100);
-                            document.getElementById('boss-hp-fill').style.width = pct + '%';
-                        }
-                    }
-                });
-
-                document.getElementById('ui-enemies').innerText = alive;
-
-                if(alive === 0 && Engine.state === 'PLAY') {
-                    this.wave++;
-                    Style.add("WAVE CLEARED", 500);
-                    this.startWave();
-                }
-            }
-        };
-
-        // ============================================================================
-        // 12. INITIALIZATION & MAIN GAME LOOP
-        // ============================================================================
-        function initGame() {
-            MapGen.build();
-            Player.init();
-            Player.updateUI();
-            
-            // Listeners
-            document.getElementById('btn-start').onclick = () => { Engine.setState('PLAY'); WaveSys.startWave(); };
-            document.getElementById('btn-resume').onclick = () => Engine.setState('PLAY');
-            document.getElementById('btn-restart').onclick = () => location.reload();
-
-            window.addEventListener('keydown', e => {
-                if(e.code === 'KeyP' || e.code === 'Escape') {
-                    if(Engine.state === 'PLAY') Engine.setState('PAUSE');
-                    else if(Engine.state === 'PAUSE') Engine.setState('PLAY');
-                }
-            });
-            
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        }
-
+        // Basic Loop Placeholder
         function animate() {
             requestAnimationFrame(animate);
-
-            const dt = Math.min(Engine.clock.getDelta(), 0.1);
-
+            const dt = Engine.clock.getDelta();
             if(Engine.state === 'PLAY') {
-                Player.update(dt);
                 Pools.update(dt);
-                WaveSys.update(dt);
                 Style.update(dt);
-
-                // Screen Shake Processing
-                if(Engine.shake > 0) {
-                    camera.position.x += (Math.random()-0.5) * Engine.shake;
-                    camera.position.y += (Math.random()-0.5) * Engine.shake;
-                    Engine.shake = Math.max(0, Engine.shake - dt * 5);
-                }
             }
-
             renderer.render(scene, camera);
         }
-
-        // Boot
-        initGame();
         animate();
     </script>
 </body>
