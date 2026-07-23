@@ -271,12 +271,12 @@ weaponContainer.add(rocketGroup);
     rocketGroup.add(rTube, rTip);
 })();
 
-// Projectile Manager (Visible Pellets & Rockets)
+// Projectile Manager (Working Slingshot Pellets & Rockets)
 const Projectiles = {
     list: [],
 
     spawnPellet(origin, direction) {
-        const geo = new THREE.SphereGeometry(0.2, 8, 8);
+        const geo = new THREE.SphereGeometry(0.35, 12, 12);
         const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.copy(origin);
@@ -290,7 +290,7 @@ const Projectiles = {
 
     spawnRocket(origin, direction) {
         const group = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.3), new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
         body.rotation.x = Math.PI / 2;
         group.add(body);
         group.position.copy(origin);
@@ -317,9 +317,12 @@ const Projectiles = {
 
             NPCs.list.forEach(npc => {
                 if (!npc.alive || hit) return;
-                if (p.mesh.position.distanceTo(npc.mesh.position) < (p.type === 'rocket' ? 2.5 : 1.2)) {
+                
+                // Optimized Hitbox Check for Slingshot & Rockets
+                const hitRadius = (p.type === 'rocket' ? 3.2 : 2.0) * npc.stats.scale;
+                if (p.mesh.position.distanceTo(npc.mesh.position.clone().add(new THREE.Vector3(0, 2, 0))) < hitRadius) {
                     npc.takeDamage(p.damage);
-                    StyleSystem.addScore(p.type === 'rocket' ? 80 : 30);
+                    StyleSystem.addScore(p.type === 'rocket' ? 80 : 35);
                     createHitParticles(p.mesh.position, p.type === 'rocket' ? 0xff0000 : 0xffff00);
                     hit = true;
                 }
@@ -536,12 +539,9 @@ const Player = {
             AudioSystem.playRocket();
             triggerScreenShake(0.35, 0.18);
 
-            if (lookDir.y < -0.7) { // Rocket jump without taking self damage
+            if (lookDir.y < -0.7) {
                 this.vel.y = CONFIG.ROCKET_JUMP_FORCE;
                 this.isGrounded = false;
-                if (CONFIG.ROCKET_SELF_DAMAGE > 0) {
-                    this.takeDamage(CONFIG.ROCKET_SELF_DAMAGE);
-                }
                 triggerScreenShake(0.5, 0.25);
                 createHitParticles(this.pos, 0xffaa00);
             }
@@ -566,69 +566,81 @@ const Player = {
     }
 };
 
-// Scary NPC & Tentacle Spawner System
+// Terrifying Monster Spawner & Health Bar Manager
 const NPCs = {
     list: [],
     spawnTimer: 0,
 
-    createScaryNoobMesh(typeConfig) {
+    createMonsterMesh(typeConfig) {
         const group = new THREE.Group();
         
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
-        const torsoMat = new THREE.MeshLambertMaterial({ color: typeConfig.color });
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 });
+        const torsoMat = new THREE.MeshStandardMaterial({ color: typeConfig.color, roughness: 0.2, metalness: 0.3 });
+        const limbMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1 });
 
-        const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), headMat);
-        head.position.y = 3.2;
+        const head = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 1.3), headMat);
+        head.position.y = 3.4;
 
-        const eyeGeo = new THREE.BoxGeometry(0.25, 0.25, 0.1);
+        // Multiple Glowing Eyes
         const eyeMat = new THREE.MeshBasicMaterial({ color: typeConfig.eyeColor });
-        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-        leftEye.position.set(-0.3, 3.3, 0.61);
-        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-        rightEye.position.set(0.3, 3.3, 0.61);
+        for (let i = 0; i < 4; i++) {
+            const eye = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.1), eyeMat);
+            eye.position.set((i - 1.5) * 0.35, 3.5, 0.66);
+            head.add(eye);
+        }
 
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 1.0), torsoMat);
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.2, 1.2), torsoMat);
         torso.position.y = 1.8;
 
-        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), legMat);
-        leftLeg.position.set(-0.55, 0, 0);
+        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.2, 0.7), limbMat);
+        leftLeg.position.set(-0.65, 0, 0);
 
-        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), legMat);
-        rightLeg.position.set(0.55, 0, 0);
+        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.2, 0.7), limbMat);
+        rightLeg.position.set(0.65, 0, 0);
 
-        // Writhing Tentacles coming out of torso
+        // Creepy Extra Spider Legs / Tentacles
         const tentacles = [];
-        const tentacleMat = new THREE.MeshStandardMaterial({ color: 0x110022, roughness: 0.2 });
+        const tentacleMat = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.2 });
         
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 6; i++) {
             const tentacleGroup = new THREE.Group();
             const tentacleMesh = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.12, 0.02, 2.5, 6),
+                new THREE.CylinderGeometry(0.1, 0.02, 3.2, 6),
                 tentacleMat
             );
-            tentacleMesh.position.y = 1.25;
+            tentacleMesh.position.y = 1.6;
             tentacleGroup.add(tentacleMesh);
             
-            // Distribute tentacles around the back/sides of torso
             const side = (i % 2 === 0) ? -1 : 1;
-            const back = (i < 2) ? -0.5 : -0.2;
-            tentacleGroup.position.set(side * 0.8, 2.0, back);
-            tentacleGroup.rotation.z = side * 0.6;
+            const yOffset = (Math.floor(i / 2) * 0.6) + 1.2;
+            tentacleGroup.position.set(side * 0.9, yOffset, -0.4);
+            tentacleGroup.rotation.z = side * 1.1;
             
             torso.add(tentacleGroup);
             tentacles.push(tentacleGroup);
         }
 
-        group.add(head, leftEye, rightEye, torso, leftLeg, rightLeg);
+        // Floating Overhead Health Bar Mesh
+        const hpCanvas = document.createElement('canvas');
+        hpCanvas.width = 128;
+        hpCanvas.height = 16;
+        const hpCtx = hpCanvas.getContext('2d');
+        const hpTexture = new THREE.CanvasTexture(hpCanvas);
+
+        const hpPlaneMat = new THREE.SpriteMaterial({ map: hpTexture });
+        const hpSprite = new THREE.Sprite(hpPlaneMat);
+        hpSprite.position.set(0, 4.8, 0);
+        hpSprite.scale.set(3.5, 0.45, 1.0);
+
+        group.add(head, torso, leftLeg, rightLeg, hpSprite);
         group.scale.setScalar(typeConfig.scale);
 
-        return { group, head, leftLeg, rightLeg, tentacles };
+        return { group, head, leftLeg, rightLeg, tentacles, hpCtx, hpTexture, hpSprite };
     },
 
     spawn(enemyTypeKey = 'CLASSIC_NOOB') {
         const typeConfig = CONFIG.ENEMIES[enemyTypeKey];
-        const meshData = this.createScaryNoobMesh(typeConfig);
+        const meshData = this.createMonsterMesh(typeConfig);
 
         const angle = Math.random() * Math.PI * 2;
         const dist = 45 + Math.random() * 25;
@@ -646,13 +658,29 @@ const NPCs = {
             leftLeg: meshData.leftLeg,
             rightLeg: meshData.rightLeg,
             tentacles: meshData.tentacles,
+            hpCtx: meshData.hpCtx,
+            hpTexture: meshData.hpTexture,
+            hpSprite: meshData.hpSprite,
             stats: typeConfig,
+            maxHp: typeConfig.hp,
             hp: typeConfig.hp,
             animTime: Math.random() * 10,
             alive: true,
+
+            updateHealthBar() {
+                const pct = Math.max(0, this.hp / this.maxHp);
+                this.hpCtx.clearRect(0, 0, 128, 16);
+                this.hpCtx.fillStyle = '#222222';
+                this.hpCtx.fillRect(0, 0, 128, 16);
+                this.hpCtx.fillStyle = '#ff0044';
+                this.hpCtx.fillRect(2, 2, Math.floor(124 * pct), 12);
+                this.hpTexture.needsUpdate = true;
+            },
+
             takeDamage(amt) {
                 AudioSystem.playHit();
                 this.hp -= amt;
+                this.updateHealthBar();
                 
                 if (this.hp <= 0) {
                     this.alive = false;
@@ -662,6 +690,7 @@ const NPCs = {
             }
         };
 
+        npc.updateHealthBar();
         this.list.push(npc);
         this.updateCount();
     },
@@ -699,18 +728,20 @@ const NPCs = {
         this.list.forEach(npc => {
             if (!npc.alive) return;
 
-            npc.animTime += dt * 12;
+            npc.animTime += dt * 14;
 
-            // Creepy movement animations
-            npc.leftLeg.rotation.x = Math.sin(npc.animTime) * 0.8;
-            npc.rightLeg.rotation.x = -Math.sin(npc.animTime) * 0.8;
-            npc.head.rotation.y = Math.sin(npc.animTime * 2) * 0.3;
+            // Terrifying Animations: twitchy head, writhing extra limbs
+            npc.leftLeg.rotation.x = Math.sin(npc.animTime) * 0.9;
+            npc.rightLeg.rotation.x = -Math.sin(npc.animTime) * 0.9;
+            npc.head.rotation.y = (Math.random() > 0.92 ? (Math.random() - 0.5) * 2 : Math.sin(npc.animTime * 2) * 0.4);
 
-            // Animate scary tentacles writhing
             npc.tentacles.forEach((tentacle, index) => {
-                tentacle.rotation.x = Math.sin(npc.animTime * 1.5 + index) * 0.5;
-                tentacle.rotation.z = Math.cos(npc.animTime * 1.5 + index) * 0.4;
+                tentacle.rotation.x = Math.sin(npc.animTime * 2.0 + index) * 0.8;
+                tentacle.rotation.z = Math.cos(npc.animTime * 2.0 + index) * 0.6;
             });
+
+            // Keep Health Bar billboard facing camera
+            npc.hpSprite.quaternion.copy(camera.quaternion);
 
             const dir = new THREE.Vector3().subVectors(Player.pos, npc.mesh.position);
             dir.y = 0;
