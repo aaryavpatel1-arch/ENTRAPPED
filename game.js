@@ -25,7 +25,6 @@ const Engine = {
         this.currentWave++;
         this.isBossWave = (this.currentWave % 10 === 0);
         
-        // Change Map Theme when advancing past a Boss
         if ((this.currentWave - 1) % 10 === 0 && this.currentWave > 1) {
             this.themeIndex = (this.themeIndex + 1) % CONFIG.THEMES.length;
             Environment.applyTheme(this.themeIndex);
@@ -176,14 +175,12 @@ const Environment = {
 
     init() {
         const size = CONFIG.MAP_SIZE;
-        // Ground Floor
         const floorGeo = new THREE.PlaneGeometry(size, size);
         const floorMat = new THREE.MeshStandardMaterial({ roughness: 0.2, metalness: 0.8 });
         this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
         this.floorMesh.rotation.x = -Math.PI / 2;
         scene.add(this.floorMesh);
 
-        // Boundary Walls (Prevents player/enemies from falling off)
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x11111a, metalness: 0.9, roughness: 0.3 });
         const wallHeight = 40;
         const halfSize = size / 2;
@@ -253,14 +250,12 @@ weaponContainer.add(rocketGroup);
 
 // Create Weapon Visual Models
 (function buildWeaponMeshes() {
-    // Sword
     const bladeMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95, roughness: 0.1 });
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.4, 0.3), bladeMat);
     blade.position.y = 1.7;
     const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.25), new THREE.MeshStandardMaterial({ color: 0x886600 }));
     swordGroup.add(blade, hilt);
 
-    // Slingshot
     const slMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.6 });
     const slHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8), slMat);
     const forkL = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), slMat);
@@ -269,7 +264,6 @@ weaponContainer.add(rocketGroup);
     forkR.position.set(0.25, 0.5, 0); forkR.rotation.z = 0.3;
     slingshotGroup.add(slHandle, forkL, forkR);
 
-    // Rocket Launcher
     const rTube = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 2.2), new THREE.MeshStandardMaterial({ color: 0x22222a, metalness: 0.9 }));
     rTube.rotation.x = Math.PI / 2;
     const rTip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.3), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
@@ -315,14 +309,12 @@ const Projectiles = {
             p.life -= dt;
             p.mesh.position.addScaledVector(p.dir, p.speed * dt);
 
-            // Spawn rocket trail smoke
             if (p.type === 'rocket') {
                 createHitParticles(p.mesh.position, 0xff5500);
             }
 
             let hit = false;
 
-            // Check collision with enemies
             NPCs.list.forEach(npc => {
                 if (!npc.alive || hit) return;
                 if (p.mesh.position.distanceTo(npc.mesh.position) < (p.type === 'rocket' ? 2.5 : 1.2)) {
@@ -333,7 +325,6 @@ const Projectiles = {
                 }
             });
 
-            // Boundary collision or expiry
             const bound = CONFIG.MAP_SIZE / 2 - 2;
             if (Math.abs(p.mesh.position.x) > bound || Math.abs(p.mesh.position.z) > bound || p.mesh.position.y <= 0) {
                 hit = true;
@@ -459,21 +450,18 @@ const Player = {
         this.vel.y -= CONFIG.GRAVITY * dt;
         this.pos.addScaledVector(this.vel, dt);
 
-        // Ground collision
         if (this.pos.y <= 3) {
             this.pos.y = 3;
             this.vel.y = 0;
             this.isGrounded = true;
         }
 
-        // Map Boundary Walls Collision
         const limit = CONFIG.MAP_SIZE / 2 - 3;
         this.pos.x = Math.max(-limit, Math.min(limit, this.pos.x));
         this.pos.z = Math.max(-limit, Math.min(limit, this.pos.z));
 
         camera.position.copy(this.pos);
 
-        // Sword Swing Animation
         if (this.isSwinging) {
             this.swingTimer += dt * 16;
             swordGroup.rotation.z = -Math.sin(this.swingTimer) * 1.9;
@@ -484,7 +472,6 @@ const Player = {
             }
         }
 
-        // Gun Recoil Animation
         if (this.recoilTimer > 0) {
             this.recoilTimer -= dt * 10;
             weaponContainer.position.z = Math.sin(this.recoilTimer) * 0.25;
@@ -533,7 +520,7 @@ const Player = {
                 }
             });
         }
-        else if (this.activeWeapon === 2) { // SLINGSHOT PROJECTILE
+        else if (this.activeWeapon === 2) { // SLINGSHOT
             if (now - this.lastAttackTime < CONFIG.WEAPONS.SLINGSHOT.cooldown) return;
             this.lastAttackTime = now;
             this.recoilTimer = 1.0;
@@ -542,17 +529,19 @@ const Player = {
             const spawnPos = this.pos.clone().add(lookDir.clone().multiplyScalar(1.5));
             Projectiles.spawnPellet(spawnPos, lookDir);
         }
-        else if (this.activeWeapon === 3) { // ROCKET LAUNCHER PROJECTILE & ROCKET JUMP
+        else if (this.activeWeapon === 3) { // ROCKET LAUNCHER & ROCKET JUMP
             if (now - this.lastAttackTime < CONFIG.WEAPONS.ROCKET.cooldown) return;
             this.lastAttackTime = now;
             this.recoilTimer = 1.8;
             AudioSystem.playRocket();
             triggerScreenShake(0.35, 0.18);
 
-            if (lookDir.y < -0.7) { // Rocket jump trigger
+            if (lookDir.y < -0.7) { // Rocket jump without taking self damage
                 this.vel.y = CONFIG.ROCKET_JUMP_FORCE;
                 this.isGrounded = false;
-                this.takeDamage(CONFIG.ROCKET_SELF_DAMAGE);
+                if (CONFIG.ROCKET_SELF_DAMAGE > 0) {
+                    this.takeDamage(CONFIG.ROCKET_SELF_DAMAGE);
+                }
                 triggerScreenShake(0.5, 0.25);
                 createHitParticles(this.pos, 0xffaa00);
             }
@@ -577,7 +566,7 @@ const Player = {
     }
 };
 
-// Scary NPC & Boss Spawner System
+// Scary NPC & Tentacle Spawner System
 const NPCs = {
     list: [],
     spawnTimer: 0,
@@ -585,7 +574,6 @@ const NPCs = {
     createScaryNoobMesh(typeConfig) {
         const group = new THREE.Group();
         
-        // Dark, distorted skin textures
         const headMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
         const torsoMat = new THREE.MeshLambertMaterial({ color: typeConfig.color });
         const legMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
@@ -593,7 +581,6 @@ const NPCs = {
         const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), headMat);
         head.position.y = 3.2;
 
-        // Scary Glowing Eyes
         const eyeGeo = new THREE.BoxGeometry(0.25, 0.25, 0.1);
         const eyeMat = new THREE.MeshBasicMaterial({ color: typeConfig.eyeColor });
         const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
@@ -610,10 +597,33 @@ const NPCs = {
         const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), legMat);
         rightLeg.position.set(0.55, 0, 0);
 
+        // Writhing Tentacles coming out of torso
+        const tentacles = [];
+        const tentacleMat = new THREE.MeshStandardMaterial({ color: 0x110022, roughness: 0.2 });
+        
+        for (let i = 0; i < 4; i++) {
+            const tentacleGroup = new THREE.Group();
+            const tentacleMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.02, 2.5, 6),
+                tentacleMat
+            );
+            tentacleMesh.position.y = 1.25;
+            tentacleGroup.add(tentacleMesh);
+            
+            // Distribute tentacles around the back/sides of torso
+            const side = (i % 2 === 0) ? -1 : 1;
+            const back = (i < 2) ? -0.5 : -0.2;
+            tentacleGroup.position.set(side * 0.8, 2.0, back);
+            tentacleGroup.rotation.z = side * 0.6;
+            
+            torso.add(tentacleGroup);
+            tentacles.push(tentacleGroup);
+        }
+
         group.add(head, leftEye, rightEye, torso, leftLeg, rightLeg);
         group.scale.setScalar(typeConfig.scale);
 
-        return { group, head, leftLeg, rightLeg };
+        return { group, head, leftLeg, rightLeg, tentacles };
     },
 
     spawn(enemyTypeKey = 'CLASSIC_NOOB') {
@@ -635,6 +645,7 @@ const NPCs = {
             head: meshData.head,
             leftLeg: meshData.leftLeg,
             rightLeg: meshData.rightLeg,
+            tentacles: meshData.tentacles,
             stats: typeConfig,
             hp: typeConfig.hp,
             animTime: Math.random() * 10,
@@ -671,7 +682,6 @@ const NPCs = {
     update(dt) {
         if (Engine.state !== 'PLAY') return;
 
-        // Wave Spawn Cycle
         this.spawnTimer += dt;
         if (this.spawnTimer > 1.6 && Engine.enemiesToSpawnInWave > 0) {
             if (Engine.isBossWave) {
@@ -691,10 +701,16 @@ const NPCs = {
 
             npc.animTime += dt * 12;
 
-            // Creepy jittering & twitching walking animation
+            // Creepy movement animations
             npc.leftLeg.rotation.x = Math.sin(npc.animTime) * 0.8;
             npc.rightLeg.rotation.x = -Math.sin(npc.animTime) * 0.8;
-            npc.head.rotation.y = Math.sin(npc.animTime * 2) * 0.3; // Distorted twitching head
+            npc.head.rotation.y = Math.sin(npc.animTime * 2) * 0.3;
+
+            // Animate scary tentacles writhing
+            npc.tentacles.forEach((tentacle, index) => {
+                tentacle.rotation.x = Math.sin(npc.animTime * 1.5 + index) * 0.5;
+                tentacle.rotation.z = Math.cos(npc.animTime * 1.5 + index) * 0.4;
+            });
 
             const dir = new THREE.Vector3().subVectors(Player.pos, npc.mesh.position);
             dir.y = 0;
@@ -707,7 +723,6 @@ const NPCs = {
                 Player.takeDamage(npc.stats.damage * dt * 2);
             }
 
-            // Map boundary containment
             const limit = CONFIG.MAP_SIZE / 2 - 3;
             npc.mesh.position.x = Math.max(-limit, Math.min(limit, npc.mesh.position.x));
             npc.mesh.position.z = Math.max(-limit, Math.min(limit, npc.mesh.position.z));
