@@ -9,7 +9,7 @@ const CONFIG = {
     MAP_SIZE: 320, // Boundary walls limit
 
     ROCKET_JUMP_FORCE: 48,
-    ROCKET_SELF_DAMAGE: 15,
+    ROCKET_SELF_DAMAGE: 0, // Disabled rocket launcher self-damage
 
     // Map Environment Themes (Rotates Every 10 Waves after Boss Defeat)
     THEMES: [
