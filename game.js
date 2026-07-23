@@ -1,10 +1,11 @@
-// Game Engine State & Wave Logic
+// Game Engine State & Environment Logic
 const Engine = {
     clock: new THREE.Clock(),
     state: 'MENU',
     currentWave: 1,
     enemiesToSpawnInWave: 10,
     isBossWave: false,
+    themeIndex: 0,
     
     setState(newState) {
         this.state = newState;
@@ -23,11 +24,18 @@ const Engine = {
     nextWave() {
         this.currentWave++;
         this.isBossWave = (this.currentWave % 10 === 0);
+        
+        // Change Map Theme when advancing past a Boss
+        if ((this.currentWave - 1) % 10 === 0 && this.currentWave > 1) {
+            this.themeIndex = (this.themeIndex + 1) % CONFIG.THEMES.length;
+            Environment.applyTheme(this.themeIndex);
+        }
+
         this.enemiesToSpawnInWave = this.isBossWave ? 1 : 10 + (this.currentWave * 2);
         
         const waveUI = document.getElementById('ui-wave');
         if (waveUI) {
-            waveUI.innerText = this.isBossWave ? `${this.currentWave} [BOSS PHASE]` : this.currentWave;
+            waveUI.innerText = this.isBossWave ? `${this.currentWave} [BOSS PHASE]` : `${this.currentWave} (${CONFIG.THEMES[this.themeIndex].name})`;
         }
     }
 };
@@ -64,7 +72,7 @@ const StyleSystem = {
     }
 };
 
-// Audio System
+// Audio Synthesizer
 const AudioSystem = {
     ctx: null,
     init() {
@@ -91,50 +99,61 @@ const AudioSystem = {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(1400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start();
-        osc.stop(this.ctx.currentTime + 0.1);
+        osc.stop(this.ctx.currentTime + 0.08);
     },
     playRocket() {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'square';
-        osc.frequency.setValueAtTime(130, this.ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.25);
+        osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(20, this.ctx.currentTime + 0.3);
         gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start();
-        osc.stop(this.ctx.currentTime + 0.25);
+        osc.stop(this.ctx.currentTime + 0.3);
+    },
+    playExplosion() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(80, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.4);
     },
     playHit() {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'square';
-        osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.12);
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.1);
         gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start();
-        osc.stop(this.ctx.currentTime + 0.12);
+        osc.stop(this.ctx.currentTime + 0.1);
     }
 };
 
-// World & Graphics Setup
+// Scene & Lighting Setup
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020205);
-scene.fog = new THREE.FogExp2(0x020205, 0.012);
-
 const camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -142,23 +161,66 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.25;
 document.body.appendChild(renderer.domElement);
 
-// Dynamic Lighting
-scene.add(new THREE.AmbientLight(0x332244, 1.2));
+const ambientLight = new THREE.AmbientLight(0x332244, 1.2);
+scene.add(ambientLight);
+
 const sunLight = new THREE.DirectionalLight(0xff0055, 2.0);
 sunLight.position.set(40, 100, 30);
 scene.add(sunLight);
 
-// Floor Grid
-const gridHelper = new THREE.GridHelper(350, 70, 0x00ffff, 0xff0055);
-gridHelper.position.y = 0.05;
-scene.add(gridHelper);
+// Environment Manager (Dynamic Themes & Boundary Walls)
+const Environment = {
+    floorMesh: null,
+    gridHelper: null,
+    walls: [],
 
-const floorMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(350, 350),
-    new THREE.MeshStandardMaterial({ color: 0x080810, roughness: 0.1, metalness: 0.8 })
-);
-floorMesh.rotation.x = -Math.PI / 2;
-scene.add(floorMesh);
+    init() {
+        const size = CONFIG.MAP_SIZE;
+        // Ground Floor
+        const floorGeo = new THREE.PlaneGeometry(size, size);
+        const floorMat = new THREE.MeshStandardMaterial({ roughness: 0.2, metalness: 0.8 });
+        this.floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        this.floorMesh.rotation.x = -Math.PI / 2;
+        scene.add(this.floorMesh);
+
+        // Boundary Walls (Prevents player/enemies from falling off)
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x11111a, metalness: 0.9, roughness: 0.3 });
+        const wallHeight = 40;
+        const halfSize = size / 2;
+
+        const wallConfigs = [
+            { pos: [0, wallHeight/2, -halfSize], size: [size, wallHeight, 2] },
+            { pos: [0, wallHeight/2, halfSize], size: [size, wallHeight, 2] },
+            { pos: [-halfSize, wallHeight/2, 0], size: [2, wallHeight, size] },
+            { pos: [halfSize, wallHeight/2, 0], size: [2, wallHeight, size] }
+        ];
+
+        wallConfigs.forEach(cfg => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(...cfg.size), wallMat);
+            wall.position.set(...cfg.pos);
+            scene.add(wall);
+            this.walls.push(wall);
+        });
+
+        this.applyTheme(0);
+    },
+
+    applyTheme(themeIdx) {
+        const theme = CONFIG.THEMES[themeIdx];
+        scene.background = new THREE.Color(theme.bg);
+        scene.fog = new THREE.FogExp2(theme.fog, 0.012);
+
+        this.floorMesh.material.color.setHex(theme.floor);
+
+        if (this.gridHelper) scene.remove(this.gridHelper);
+        this.gridHelper = new THREE.GridHelper(CONFIG.MAP_SIZE, 60, theme.grid1, theme.grid2);
+        this.gridHelper.position.y = 0.05;
+        scene.add(this.gridHelper);
+
+        sunLight.color.setHex(theme.grid2);
+    }
+};
+Environment.init();
 
 // Screen Shake Engine
 let screenShakeTimer = 0;
@@ -168,15 +230,13 @@ function triggerScreenShake(intensity = 0.3, duration = 0.15) {
     screenShakeTimer = duration;
 }
 
-// ============================================================================
-// GLTF LOADER SETUP & WEAPON MODELS
-// ============================================================================
+// 3D Weapon Models Setup
 const gltfLoader = new THREE.GLTFLoader();
 const weaponContainer = new THREE.Group();
 camera.add(weaponContainer);
 scene.add(camera);
 
-// Weapon Groups
+// Viewmodel Groups
 const swordGroup = new THREE.Group();
 swordGroup.position.set(0.6, -0.6, -1.1);
 weaponContainer.add(swordGroup);
@@ -191,87 +251,123 @@ rocketGroup.position.set(0.6, -0.5, -1.0);
 rocketGroup.visible = false;
 weaponContainer.add(rocketGroup);
 
-// Create Procedural Fallback Weapons
-function createProceduralFallbackWeapons() {
-    // Fallback Sword
-    const bladeGeo = new THREE.BoxGeometry(0.1, 3.4, 0.3);
-    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.95, roughness: 0.1 });
-    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+// Create Weapon Visual Models
+(function buildWeaponMeshes() {
+    // Sword
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95, roughness: 0.1 });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.4, 0.3), bladeMat);
     blade.position.y = 1.7;
-    const hiltGeo = new THREE.BoxGeometry(0.7, 0.1, 0.25);
-    const hiltMat = new THREE.MeshStandardMaterial({ color: 0x886600, metalness: 0.8 });
-    const hilt = new THREE.Mesh(hiltGeo, hiltMat);
+    const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.25), new THREE.MeshStandardMaterial({ color: 0x886600 }));
     swordGroup.add(blade, hilt);
 
-    // Fallback Slingshot
-    const slHandleMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.6 });
-    const slHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8), slHandleMat);
-    const forkL = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), slHandleMat);
+    // Slingshot
+    const slMat = new THREE.MeshStandardMaterial({ color: 0x553311, roughness: 0.6 });
+    const slHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8), slMat);
+    const forkL = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), slMat);
     forkL.position.set(-0.25, 0.5, 0); forkL.rotation.z = -0.3;
-    const forkR = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), slHandleMat);
+    const forkR = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), slMat);
     forkR.position.set(0.25, 0.5, 0); forkR.rotation.z = 0.3;
     slingshotGroup.add(slHandle, forkL, forkR);
 
-    // Fallback Rocket Launcher
-    const rTube = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.25, 0.25, 2.2),
-        new THREE.MeshStandardMaterial({ color: 0x22222a, metalness: 0.9, roughness: 0.2 })
-    );
+    // Rocket Launcher
+    const rTube = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 2.2), new THREE.MeshStandardMaterial({ color: 0x22222a, metalness: 0.9 }));
     rTube.rotation.x = Math.PI / 2;
-    const rTip = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.28, 0.28, 0.3),
-        new THREE.MeshBasicMaterial({ color: 0xff0055 })
-    );
-    rTip.rotation.x = Math.PI / 2;
-    rTip.position.z = -1.0;
+    const rTip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.3), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
+    rTip.rotation.x = Math.PI / 2; rTip.position.z = -1.0;
     rocketGroup.add(rTube, rTip);
-}
-createProceduralFallbackWeapons();
+})();
 
-// Helper Function to Load External 3D GLTF/GLB Models
-function loadCustomModel(path, targetGroup, scale = 1, rotation = [0,0,0], position = [0,0,0]) {
-    gltfLoader.load(
-        path,
-        (gltf) => {
-            // Remove fallback procedural meshes if custom model successfully loads
-            while (targetGroup.children.length > 0) {
-                targetGroup.remove(targetGroup.children[0]);
+// Projectile Manager (Visible Pellets & Rockets)
+const Projectiles = {
+    list: [],
+
+    spawnPellet(origin, direction) {
+        const geo = new THREE.SphereGeometry(0.2, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(origin);
+        scene.add(mesh);
+
+        this.list.push({
+            mesh, dir: direction, speed: CONFIG.WEAPONS.SLINGSHOT.speed,
+            damage: CONFIG.WEAPONS.SLINGSHOT.damage, type: 'pellet', life: 2.0
+        });
+    },
+
+    spawnRocket(origin, direction) {
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
+        body.rotation.x = Math.PI / 2;
+        group.add(body);
+        group.position.copy(origin);
+        group.lookAt(origin.clone().add(direction));
+        scene.add(group);
+
+        this.list.push({
+            mesh: group, dir: direction, speed: CONFIG.WEAPONS.ROCKET.speed,
+            damage: CONFIG.WEAPONS.ROCKET.damage, type: 'rocket', life: 3.0
+        });
+    },
+
+    update(dt) {
+        for (let i = this.list.length - 1; i >= 0; i--) {
+            const p = this.list[i];
+            p.life -= dt;
+            p.mesh.position.addScaledVector(p.dir, p.speed * dt);
+
+            // Spawn rocket trail smoke
+            if (p.type === 'rocket') {
+                createHitParticles(p.mesh.position, 0xff5500);
             }
-            const model = gltf.scene;
-            model.scale.setScalar(scale);
-            model.rotation.set(rotation[0], rotation[1], rotation[2]);
-            model.position.set(position[0], position[1], position[2]);
-            targetGroup.add(model);
-            console.log(`Successfully loaded model: ${path}`);
-        },
-        undefined,
-        (error) => {
-            console.warn(`Could not load GLTF model from '${path}'. Using procedural model fallback.`, error);
+
+            let hit = false;
+
+            // Check collision with enemies
+            NPCs.list.forEach(npc => {
+                if (!npc.alive || hit) return;
+                if (p.mesh.position.distanceTo(npc.mesh.position) < (p.type === 'rocket' ? 2.5 : 1.2)) {
+                    npc.takeDamage(p.damage);
+                    StyleSystem.addScore(p.type === 'rocket' ? 80 : 30);
+                    createHitParticles(p.mesh.position, p.type === 'rocket' ? 0xff0000 : 0xffff00);
+                    hit = true;
+                }
+            });
+
+            // Boundary collision or expiry
+            const bound = CONFIG.MAP_SIZE / 2 - 2;
+            if (Math.abs(p.mesh.position.x) > bound || Math.abs(p.mesh.position.z) > bound || p.mesh.position.y <= 0) {
+                hit = true;
+            }
+
+            if (hit || p.life <= 0) {
+                if (p.type === 'rocket') {
+                    AudioSystem.playExplosion();
+                    triggerScreenShake(0.4, 0.2);
+                    createHitParticles(p.mesh.position, 0xff0055);
+                }
+                scene.remove(p.mesh);
+                this.list.splice(i, 1);
+            }
         }
-    );
-}
+    }
+};
 
-// To use custom 3D model files, place your .gltf/.glb files in your folder and uncomment these lines:
-// loadCustomModel('models/sword.glb', swordGroup, 1.0, [0, 0, 0], [0, 0, 0]);
-// loadCustomModel('models/slingshot.glb', slingshotGroup, 1.0, [0, 0, 0], [0, 0, 0]);
-// loadCustomModel('models/rocket_launcher.glb', rocketGroup, 1.0, [0, 0, 0], [0, 0, 0]);
-
-// Particle FX
+// Particle Effects
 const particles = [];
 function createHitParticles(pos, color = 0xff0044) {
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 8; i++) {
         const pGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
         const pMat = new THREE.MeshBasicMaterial({ color: color });
         const p = new THREE.Mesh(pGeo, pMat);
         p.position.copy(pos);
         
         const vel = new THREE.Vector3(
-            (Math.random() - 0.5) * 18,
-            Math.random() * 15 + 3,
-            (Math.random() - 0.5) * 18
+            (Math.random() - 0.5) * 16,
+            Math.random() * 12 + 2,
+            (Math.random() - 0.5) * 16
         );
         scene.add(p);
-        particles.push({ mesh: p, vel: vel, life: 0.35 });
+        particles.push({ mesh: p, vel: vel, life: 0.3 });
     }
 }
 
@@ -288,7 +384,7 @@ function updateParticles(dt) {
     }
 }
 
-// Input System
+// Input Manager
 const Input = {
     keys: {},
     init() {
@@ -363,14 +459,21 @@ const Player = {
         this.vel.y -= CONFIG.GRAVITY * dt;
         this.pos.addScaledVector(this.vel, dt);
 
+        // Ground collision
         if (this.pos.y <= 3) {
             this.pos.y = 3;
             this.vel.y = 0;
             this.isGrounded = true;
         }
 
+        // Map Boundary Walls Collision
+        const limit = CONFIG.MAP_SIZE / 2 - 3;
+        this.pos.x = Math.max(-limit, Math.min(limit, this.pos.x));
+        this.pos.z = Math.max(-limit, Math.min(limit, this.pos.z));
+
         camera.position.copy(this.pos);
 
+        // Sword Swing Animation
         if (this.isSwinging) {
             this.swingTimer += dt * 16;
             swordGroup.rotation.z = -Math.sin(this.swingTimer) * 1.9;
@@ -381,6 +484,7 @@ const Player = {
             }
         }
 
+        // Gun Recoil Animation
         if (this.recoilTimer > 0) {
             this.recoilTimer -= dt * 10;
             weaponContainer.position.z = Math.sin(this.recoilTimer) * 0.25;
@@ -405,8 +509,10 @@ const Player = {
 
     attack() {
         const now = Engine.clock.getElapsedTime();
+        const lookDir = new THREE.Vector3();
+        camera.getWorldDirection(lookDir);
 
-        if (this.activeWeapon === 1) { // SWORD
+        if (this.activeWeapon === 1) { // SWORD MELEE
             if (now - this.lastAttackTime < CONFIG.WEAPONS.SWORD.cooldown) return;
             this.lastAttackTime = now;
             this.isSwinging = true;
@@ -416,12 +522,8 @@ const Player = {
 
             NPCs.list.forEach((npc) => {
                 if (!npc.alive) return;
-                const dist = this.pos.distanceTo(npc.mesh.position);
-                if (dist <= CONFIG.WEAPONS.SWORD.range) {
+                if (this.pos.distanceTo(npc.mesh.position) <= CONFIG.WEAPONS.SWORD.range) {
                     const dirToNPC = new THREE.Vector3().subVectors(npc.mesh.position, this.pos).normalize();
-                    const lookDir = new THREE.Vector3();
-                    camera.getWorldDirection(lookDir);
-                    
                     if (lookDir.dot(dirToNPC) > 0.35) {
                         npc.takeDamage(CONFIG.WEAPONS.SWORD.damage);
                         StyleSystem.addScore(45);
@@ -431,36 +533,23 @@ const Player = {
                 }
             });
         }
-        else if (this.activeWeapon === 2) { // SLINGSHOT
+        else if (this.activeWeapon === 2) { // SLINGSHOT PROJECTILE
             if (now - this.lastAttackTime < CONFIG.WEAPONS.SLINGSHOT.cooldown) return;
             this.lastAttackTime = now;
             this.recoilTimer = 1.0;
             AudioSystem.playSlingshot();
 
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            
-            NPCs.list.forEach((npc) => {
-                if (!npc.alive) return;
-                const intersects = raycaster.intersectObject(npc.mesh, true);
-                if (intersects.length > 0) {
-                    npc.takeDamage(CONFIG.WEAPONS.SLINGSHOT.damage);
-                    StyleSystem.addScore(25);
-                    createHitParticles(intersects[0].point, 0xffff00);
-                }
-            });
+            const spawnPos = this.pos.clone().add(lookDir.clone().multiplyScalar(1.5));
+            Projectiles.spawnPellet(spawnPos, lookDir);
         }
-        else if (this.activeWeapon === 3) { // ROCKET LAUNCHER & ROCKET JUMP
+        else if (this.activeWeapon === 3) { // ROCKET LAUNCHER PROJECTILE & ROCKET JUMP
             if (now - this.lastAttackTime < CONFIG.WEAPONS.ROCKET.cooldown) return;
             this.lastAttackTime = now;
             this.recoilTimer = 1.8;
             AudioSystem.playRocket();
             triggerScreenShake(0.35, 0.18);
 
-            const lookDir = new THREE.Vector3();
-            camera.getWorldDirection(lookDir);
-            
-            if (lookDir.y < -0.7) { 
+            if (lookDir.y < -0.7) { // Rocket jump trigger
                 this.vel.y = CONFIG.ROCKET_JUMP_FORCE;
                 this.isGrounded = false;
                 this.takeDamage(CONFIG.ROCKET_SELF_DAMAGE);
@@ -468,18 +557,8 @@ const Player = {
                 createHitParticles(this.pos, 0xffaa00);
             }
 
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-
-            NPCs.list.forEach((npc) => {
-                if (!npc.alive) return;
-                const intersects = raycaster.intersectObject(npc.mesh, true);
-                if (intersects.length > 0) {
-                    npc.takeDamage(CONFIG.WEAPONS.ROCKET.damage);
-                    StyleSystem.addScore(80);
-                    createHitParticles(intersects[0].point, 0xffaa00);
-                }
-            });
+            const spawnPos = this.pos.clone().add(lookDir.clone().multiplyScalar(2.0));
+            Projectiles.spawnRocket(spawnPos, lookDir);
         }
     },
 
@@ -498,20 +577,29 @@ const Player = {
     }
 };
 
-// Enemy & Boss Spawner System
+// Scary NPC & Boss Spawner System
 const NPCs = {
     list: [],
     spawnTimer: 0,
 
-    createNoobMesh(typeConfig) {
+    createScaryNoobMesh(typeConfig) {
         const group = new THREE.Group();
         
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+        // Dark, distorted skin textures
+        const headMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
         const torsoMat = new THREE.MeshLambertMaterial({ color: typeConfig.color });
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
 
         const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), headMat);
         head.position.y = 3.2;
+
+        // Scary Glowing Eyes
+        const eyeGeo = new THREE.BoxGeometry(0.25, 0.25, 0.1);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: typeConfig.eyeColor });
+        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+        leftEye.position.set(-0.3, 3.3, 0.61);
+        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+        rightEye.position.set(0.3, 3.3, 0.61);
 
         const torso = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 1.0), torsoMat);
         torso.position.y = 1.8;
@@ -522,30 +610,34 @@ const NPCs = {
         const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), legMat);
         rightLeg.position.set(0.55, 0, 0);
 
-        group.add(head, torso, leftLeg, rightLeg);
+        group.add(head, leftEye, rightEye, torso, leftLeg, rightLeg);
         group.scale.setScalar(typeConfig.scale);
 
-        return group;
+        return { group, head, leftLeg, rightLeg };
     },
 
     spawn(enemyTypeKey = 'CLASSIC_NOOB') {
         const typeConfig = CONFIG.ENEMIES[enemyTypeKey];
-        const group = this.createNoobMesh(typeConfig);
+        const meshData = this.createScaryNoobMesh(typeConfig);
 
         const angle = Math.random() * Math.PI * 2;
-        const dist = 50 + Math.random() * 30;
-        group.position.set(
+        const dist = 45 + Math.random() * 25;
+        meshData.group.position.set(
             Player.pos.x + Math.cos(angle) * dist,
             0,
             Player.pos.z + Math.sin(angle) * dist
         );
 
-        scene.add(group);
+        scene.add(meshData.group);
 
         const npc = {
-            mesh: group,
+            mesh: meshData.group,
+            head: meshData.head,
+            leftLeg: meshData.leftLeg,
+            rightLeg: meshData.rightLeg,
             stats: typeConfig,
             hp: typeConfig.hp,
+            animTime: Math.random() * 10,
             alive: true,
             takeDamage(amt) {
                 AudioSystem.playHit();
@@ -579,13 +671,14 @@ const NPCs = {
     update(dt) {
         if (Engine.state !== 'PLAY') return;
 
+        // Wave Spawn Cycle
         this.spawnTimer += dt;
-        if (this.spawnTimer > 1.8 && Engine.enemiesToSpawnInWave > 0) {
+        if (this.spawnTimer > 1.6 && Engine.enemiesToSpawnInWave > 0) {
             if (Engine.isBossWave) {
                 this.spawn('BOSS_NOOB');
                 Engine.enemiesToSpawnInWave = 0;
             } else {
-                const keys = ['CLASSIC_NOOB', 'SPEED_NOOB', 'TANK_NOOB'];
+                const keys = ['CLASSIC_NOOB', 'SPEED_NOOB', 'TANK_NOOB', 'STALKER_NOOB', 'CRAWLER_NOOB'];
                 const pickedKey = keys[Math.floor(Math.random() * keys.length)];
                 this.spawn(pickedKey);
                 Engine.enemiesToSpawnInWave--;
@@ -595,6 +688,13 @@ const NPCs = {
 
         this.list.forEach(npc => {
             if (!npc.alive) return;
+
+            npc.animTime += dt * 12;
+
+            // Creepy jittering & twitching walking animation
+            npc.leftLeg.rotation.x = Math.sin(npc.animTime) * 0.8;
+            npc.rightLeg.rotation.x = -Math.sin(npc.animTime) * 0.8;
+            npc.head.rotation.y = Math.sin(npc.animTime * 2) * 0.3; // Distorted twitching head
 
             const dir = new THREE.Vector3().subVectors(Player.pos, npc.mesh.position);
             dir.y = 0;
@@ -606,11 +706,16 @@ const NPCs = {
             } else {
                 Player.takeDamage(npc.stats.damage * dt * 2);
             }
+
+            // Map boundary containment
+            const limit = CONFIG.MAP_SIZE / 2 - 3;
+            npc.mesh.position.x = Math.max(-limit, Math.min(limit, npc.mesh.position.x));
+            npc.mesh.position.z = Math.max(-limit, Math.min(limit, npc.mesh.position.z));
         });
     }
 };
 
-// Interface Listeners
+// Menu Actions
 document.getElementById('btn-start').onclick = () => Engine.setState('PLAY');
 document.getElementById('btn-resume').onclick = () => Engine.setState('PLAY');
 document.getElementById('btn-restart').onclick = () => location.reload();
@@ -628,13 +733,14 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Main Loop
+// Main Animation Engine Loop
 function animate() {
     requestAnimationFrame(animate);
     const dt = Engine.clock.getDelta();
 
     Player.update(dt);
     NPCs.update(dt);
+    Projectiles.update(dt);
     StyleSystem.update(dt);
     updateParticles(dt);
 
