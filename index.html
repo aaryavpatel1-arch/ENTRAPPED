@@ -1,67 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Combat Initiation - Arena</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-</head>
-<body>
-    <div id="crt-lines"></div>
-    <div id="vignette"></div>
-    <div id="damage-overlay"></div>
+// Game Balance Configuration with Waves, Bosses & Map Themes
+const CONFIG = {
+    PLAYER_SPEED: 22,
+    DASH_SPEED: 55,
+    DASH_COOLDOWN: 1.0,
+    JUMP_FORCE: 28,
+    GRAVITY: 62,
+    MOUSE_SENSITIVITY: 0.0022,
+    MAP_SIZE: 320, // Boundary walls limit
 
-    <div id="hud-top-left" class="hud-panel">
-        <div class="wave-text">WAVE <span id="ui-wave" class="wave-val">1</span></div>
-        <div class="enemy-count">ENEMIES LEFT: <span id="ui-enemies">0</span></div>
-    </div>
+    ROCKET_JUMP_FORCE: 48,
+    ROCKET_SELF_DAMAGE: 0, // Disabled rocket launcher self-damage
 
-    <div id="style-hud" class="hud-panel">
-        <div id="style-rank-text">DESTRUCTIVE</div>
-        <div id="style-mult">x1.0</div>
-    </div>
+    // Map Environment Themes (Rotates Every 10 Waves after Boss Defeat)
+    THEMES: [
+        { name: 'CYBER VOID', bg: 0x020205, fog: 0x020205, floor: 0x080810, grid1: 0x00ffff, grid2: 0xff0055 },
+        { name: 'BLOOD ARENA', bg: 0x0a0002, fog: 0x0a0002, floor: 0x150205, grid1: 0xff0000, grid2: 0x550000 },
+        { name: 'TOXIC WASTELAND', bg: 0x010a02, fog: 0x010a02, floor: 0x051508, grid1: 0x00ff44, grid2: 0x005511 },
+        { name: 'SHADOW REALM', bg: 0x000000, fog: 0x000000, floor: 0x030303, grid1: 0x8800ff, grid2: 0x220044 }
+    ],
 
-    <div id="crosshair-container">
-        <div class="ch-line" id="ch-top"></div>
-        <div class="ch-line" id="ch-bot"></div>
-        <div class="ch-line" id="ch-left"></div>
-        <div class="ch-line" id="ch-right"></div>
-        <div id="ch-dot"></div>
-    </div>
+    // Terrifying Enemy Types & Stats
+    ENEMIES: {
+        CLASSIC_NOOB: { hp: 100, speed: 12, damage: 15, color: 0x220000, scale: 1.0, eyeColor: 0xff0000 },
+        SPEED_NOOB: { hp: 70, speed: 23, damage: 10, color: 0x330033, scale: 0.85, eyeColor: 0x00ffff },
+        TANK_NOOB: { hp: 300, speed: 8, damage: 25, color: 0x111111, scale: 1.5, eyeColor: 0xff0000 },
+        STALKER_NOOB: { hp: 110, speed: 18, damage: 20, color: 0x050505, scale: 1.1, eyeColor: 0xff0055 },
+        CRAWLER_NOOB: { hp: 80, speed: 26, damage: 12, color: 0x110000, scale: 0.7, eyeColor: 0xffff00 },
+        BOSS_NOOB: { hp: 1600, speed: 11, damage: 45, color: 0x440000, scale: 3.5, eyeColor: 0xffffff }
+    },
 
-    <div id="hud-bottom-left" class="hud-panel">
-        <div id="hp-val">100 HP</div>
-        <div id="hp-bar-container">
-            <div id="hp-bar-fill"></div>
-        </div>
-    </div>
-
-    <div id="hud-bottom-right" class="hud-panel">
-        <div id="weapon-display">REAL SWORD</div>
-        <div class="controls-hint">
-            [1] Sword | [2] Slingshot | [3] Rocket<br>
-            [WASD] Move | [SHIFT] Dash | [SPACE] Jump
-        </div>
-    </div>
-
-    <div id="menu-main" class="menu-overlay">
-        <h1 class="menu-title">COMBAT INITIATION</h1>
-        <button id="btn-start" class="btn">START COMBAT</button>
-    </div>
-
-    <div id="menu-pause" class="menu-overlay">
-        <h1 class="menu-title">PAUSED</h1>
-        <button id="btn-resume" class="btn">RESUME</button>
-    </div>
-
-    <div id="menu-death" class="menu-overlay">
-        <h1 class="menu-title" style="color: var(--danger);">YOU DIED</h1>
-        <button id="btn-restart" class="btn">RETRY</button>
-    </div>
-
-    <script src="config.js"></script>
-    <script src="game.js"></script>
-</body>
-</html>
+    WEAPONS: {
+        SWORD: { name: 'REAL SWORD', damage: 85, range: 7.5, cooldown: 0.28, type: 'melee' },
+        SLINGSHOT: { name: 'SLINGSHOT', damage: 65, speed: 220, cooldown: 0.14, type: 'projectile' },
+        ROCKET: { name: 'ROCKET LAUNCHER', damage: 180, speed: 100, cooldown: 0.75, type: 'projectile' }
+    }
+};
